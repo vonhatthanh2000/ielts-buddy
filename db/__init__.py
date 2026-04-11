@@ -1,9 +1,10 @@
 from db.connection import SessionLocal, engine, get_db
-from db.models import Base, SentenceCorrection
+from db.models import Base, Sentence, SentenceMistake
 
 __all__ = [
     "Base",
-    "SentenceCorrection",
+    "Sentence",
+    "SentenceMistake",
     "SessionLocal",
     "engine",
     "get_db",
