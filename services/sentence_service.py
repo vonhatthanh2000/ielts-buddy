@@ -1,24 +1,24 @@
 import json
 
-from sqlalchemy.orm import Session
+from supabase import Client
 
 from agents.sentence_correct_agent import sentence_correct_agent
-from db.models import Sentence, SentenceMistake
 
 
-def correct_sentence(text: str, db: Session) -> dict:
+def correct_sentence(text: str, supabase: Client) -> dict:
     """
-    Full pipeline: call agent → parse output → save to DB → return result.
+    Full pipeline: call agent → parse output → save to Supabase → return result.
     """
     raw = _run_agent(text)
     parsed = _parse_output(text, raw)
-    _save(parsed, db)
+    _save(parsed, supabase)
     return parsed
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _run_agent(text: str) -> str:
     response = sentence_correct_agent.run(text)
@@ -43,26 +43,31 @@ def _parse_output(original_text: str, raw: str) -> dict:
     return data
 
 
-def _save(data: dict, db: Session) -> None:
-    sentence = Sentence(
-        original=data.get("original", ""),
-        corrected=data.get("corrected", ""),
-        natural=data.get("natural", ""),
-        has_mistakes=data.get("has_mistakes", False),
-        tip=data.get("tip"),
-    )
-    db.add(sentence)
-    db.flush()  # get sentence.id before inserting mistakes
+def _save(data: dict, supabase: Client) -> None:
+    row = {
+        "original": data.get("original", ""),
+        "corrected": data.get("corrected", ""),
+        "natural": data.get("natural", ""),
+        "has_mistakes": data.get("has_mistakes", False),
+        "tip": data.get("tip"),
+    }
+    res = supabase.table("sentences").insert(row).select("id").execute()
+    if not res.data:
+        raise RuntimeError("Failed to insert sentence")
+    sentence_id = res.data[0]["id"]
 
-    for m in data.get("mistakes", []):
-        db.add(
-            SentenceMistake(
-                sentence_id=sentence.id,
-                type=m.get("type", ""),
-                original=m.get("original"),
-                fix=m.get("fix"),
-                explanation=m.get("explanation"),
-            )
-        )
+    mistakes = data.get("mistakes", [])
+    if not mistakes:
+        return
 
-    db.commit()
+    payload = [
+        {
+            "sentence_id": sentence_id,
+            "type": m.get("type", ""),
+            "original": m.get("original"),
+            "fix": m.get("fix"),
+            "explanation": m.get("explanation"),
+        }
+        for m in mistakes
+    ]
+    supabase.table("sentence_mistakes").insert(payload).execute()

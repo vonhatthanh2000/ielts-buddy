@@ -6,8 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.sentence_router import router as sentence_router
-from db.connection import engine
-from db.models import Base
+from api.user_router import router as user_router
 
 load_dotenv()
 
@@ -25,11 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create all tables on startup (safe to run multiple times).
-Base.metadata.create_all(bind=engine)
-
 # Register routers.
 app.include_router(sentence_router)
+app.include_router(user_router)
 
 
 @app.get("/health", tags=["health"])

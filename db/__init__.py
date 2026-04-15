@@ -1,11 +1,3 @@
-from db.connection import SessionLocal, engine, get_db
-from db.models import Base, Sentence, SentenceMistake
+from db.supabase_client import get_supabase
 
-__all__ = [
-    "Base",
-    "Sentence",
-    "SentenceMistake",
-    "SessionLocal",
-    "engine",
-    "get_db",
-]
+__all__ = ["get_supabase"]
