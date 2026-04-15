@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from schemas import LoginRequest, LoginResponse, RegisterRequest
+from schemas import LoginRequest, LoginResponse, RegisterRequest, UserResponse
 from supabase.client import Client, get_supabase
 from services import auth_service, user_service
 
@@ -33,7 +33,8 @@ def register(body: RegisterRequest, supabase: Client = Depends(get_supabase)) ->
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     user_id = str(created["id"])
     token, expires_in = auth_service.create_session_token(user_id, key)
-    return LoginResponse(access_token=token, expires_in=expires_in)
+    profile = UserResponse.model_validate(created)
+    return LoginResponse(access_token=token, expires_in=expires_in, user=profile)
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -47,4 +48,5 @@ def login(body: LoginRequest, supabase: Client = Depends(get_supabase)) -> Login
     user_id = str(row["id"])
     username = str(row.get("username") or body.username.strip().lower())
     token, expires_in = auth_service.create_session_token(user_id, username)
-    return LoginResponse(access_token=token, expires_in=expires_in)
+    profile = UserResponse.model_validate(row)
+    return LoginResponse(access_token=token, expires_in=expires_in, user=profile)

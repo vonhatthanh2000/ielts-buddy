@@ -51,7 +51,7 @@ def _save(data: dict, supabase: Client, user_id: str) -> None:
         "natural": data.get("natural", ""),
         "has_mistakes": data.get("has_mistakes", False),
     }
-    res = supabase.table("sentences").insert(row).select("id").execute()
+    res = supabase.table("sentences").insert(row).execute()
     if not res.data:
         raise RuntimeError("Failed to insert sentence")
     sentence_id = res.data[0]["id"]

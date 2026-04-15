@@ -35,7 +35,7 @@ def create_user(
         "password_hash": password_hash,
         "name": display,
     }
-    res = supabase.table("users").insert(row).select("id", "username", "name", "created_at").execute()
+    res = supabase.table("users").insert(row).execute()
     if not res.data:
         raise RuntimeError("Failed to create user")
     return res.data[0]
