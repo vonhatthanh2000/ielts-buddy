@@ -11,6 +11,8 @@ dependencies = [
     "phidata>=2.0.0",
     "python-dotenv>=1.0.0",
     "supabase>=2.0.0",
+    "PyJWT>=2.8.0",
+    "bcrypt>=4.1.0",
 ]
 
 # Editable install (`pip install -e .`) puts the project root on sys.path so

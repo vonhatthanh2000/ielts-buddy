@@ -11,7 +11,7 @@ def correct_sentence(text: str, supabase: Client) -> dict:
     """
     raw = _run_agent(text)
     parsed = _parse_output(text, raw)
-    _save(parsed, supabase)
+    # _save(parsed, supabase)
     return parsed
 
 
