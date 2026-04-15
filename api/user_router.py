@@ -1,11 +1,10 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from supabase import Client
 
 from api.deps import get_current_user_id
 from schemas import UserResponse
-from db.supabase_client import get_supabase
+from supabase.client import Client, get_supabase
 from services import user_service
 
 router = APIRouter(prefix="/v1/users", tags=["users"])

@@ -1,17 +1,17 @@
 import json
 
-from supabase import Client
+from supabase.client import Client
 
 from agents.sentence_correct_agent import sentence_correct_agent
 
 
-def correct_sentence(text: str, supabase: Client) -> dict:
+def correct_sentence(text: str, supabase: Client, user_id: str) -> dict:
     """
     Full pipeline: call agent → parse output → save to Supabase → return result.
     """
     raw = _run_agent(text)
     parsed = _parse_output(text, raw)
-    # _save(parsed, supabase)
+    _save(parsed, supabase, user_id)
     return parsed
 
 
@@ -43,13 +43,13 @@ def _parse_output(original_text: str, raw: str) -> dict:
     return data
 
 
-def _save(data: dict, supabase: Client) -> None:
+def _save(data: dict, supabase: Client, user_id: str) -> None:
     row = {
+        "user_id": user_id,
         "original": data.get("original", ""),
         "corrected": data.get("corrected", ""),
         "natural": data.get("natural", ""),
         "has_mistakes": data.get("has_mistakes", False),
-        "tip": data.get("tip"),
     }
     res = supabase.table("sentences").insert(row).select("id").execute()
     if not res.data:

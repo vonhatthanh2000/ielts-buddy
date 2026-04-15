@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
-from supabase import Client
 
 from schemas import LoginRequest, LoginResponse, RegisterRequest
-from db.supabase_client import get_supabase
+from supabase.client import Client, get_supabase
 from services import auth_service, user_service
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
