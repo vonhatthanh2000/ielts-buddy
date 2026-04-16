@@ -24,6 +24,27 @@ class SentenceMistakeItem(BaseModel):
     explanation: Optional[str] = Field(None, description="Short explanation (B1–B2 level).")
 
 
+class ImprovementItem(BaseModel):
+    """One natural phrase improvement for revision."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    original_phrase: str = Field(
+        ...,
+        description="Original phrasing that could be more natural",
+        examples=["I want to find"],
+    )
+    improved_phrase: str = Field(
+        ...,
+        description="More natural, idiomatic alternative expressing the same meaning",
+        examples=["I am looking for"],
+    )
+    explanation: Optional[str] = Field(
+        None,
+        description="Why the improved version sounds more natural",
+    )
+
+
 class SentenceCorrectResponse(BaseModel):
     """Successful sentence correction payload (matches agent JSON + has_mistakes)."""
 
@@ -36,5 +57,9 @@ class SentenceCorrectResponse(BaseModel):
     mistakes: List[SentenceMistakeItem] = Field(
         default_factory=list,
         description="Identified issues; empty if the sentence is already fine.",
+    )
+    improvements: List[ImprovementItem] = Field(
+        default_factory=list,
+        description="Natural phrase improvements for revision (e.g., 'I want to find' -> 'I am looking for').",
     )
     tip: Optional[str] = Field(None, description="One short improvement tip.")

@@ -35,11 +35,15 @@ def _parse_output(original_text: str, raw: str) -> dict:
             "natural": original_text,
             "has_mistakes": False,
             "mistakes": [],
+            "improvements": [],
             "tip": "Agent output could not be parsed.",
         }
 
     mistakes = data.get("mistakes", [])
     data["has_mistakes"] = len(mistakes) > 0
+    # Ensure improvements field exists (backward compatibility)
+    if "improvements" not in data:
+        data["improvements"] = []
     return data
 
 
@@ -56,18 +60,32 @@ def _save(data: dict, supabase: Client, user_id: str) -> None:
         raise RuntimeError("Failed to insert sentence")
     sentence_id = res.data[0]["id"]
 
+    # Save mistakes
     mistakes = data.get("mistakes", [])
-    if not mistakes:
-        return
+    if mistakes:
+        payload = [
+            {
+                "sentence_id": sentence_id,
+                "type": m.get("type", ""),
+                "original": m.get("original"),
+                "fix": m.get("fix"),
+                "explanation": m.get("explanation"),
+            }
+            for m in mistakes
+        ]
+        supabase.table("sentence_mistakes").insert(payload).execute()
 
-    payload = [
-        {
-            "sentence_id": sentence_id,
-            "type": m.get("type", ""),
-            "original": m.get("original"),
-            "fix": m.get("fix"),
-            "explanation": m.get("explanation"),
-        }
-        for m in mistakes
-    ]
-    supabase.table("sentence_mistakes").insert(payload).execute()
+    # Save improvements (natural phrase alternatives)
+    improvements = data.get("improvements", [])
+    if improvements:
+        improvement_payload = [
+            {
+                "sentence_id": sentence_id,
+                "original_phrase": imp.get("original_phrase", ""),
+                "improved_phrase": imp.get("improved_phrase", ""),
+                "explanation": imp.get("explanation"),
+                "context": data.get("original", ""),
+            }
+            for imp in improvements
+        ]
+        supabase.table("sentence_improvements").insert(improvement_payload).execute()

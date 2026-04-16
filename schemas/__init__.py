@@ -7,6 +7,7 @@ submodules ``schemas.sentence``, ``schemas.user``.
 
 from schemas.auth import LoginRequest, LoginResponse, RegisterRequest
 from schemas.sentence import (
+    ImprovementItem,
     SentenceCorrectResponse,
     SentenceMistakeItem,
     SentenceRequest,
@@ -14,6 +15,7 @@ from schemas.sentence import (
 from schemas.user import UserResponse
 
 __all__ = [
+    "ImprovementItem",
     "LoginRequest",
     "LoginResponse",
     "RegisterRequest",

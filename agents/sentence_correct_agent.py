@@ -18,6 +18,10 @@ SENTENCE_AGENT_INSTRUCTIONS = [
 
     "Identify key mistakes including grammar, word choice, and fluency issues.",
 
+    "Identify improvement opportunities: phrases that are grammatically correct but could sound more natural or idiomatic.",
+
+    "For each improvement, extract the specific original phrase and provide the improved, more natural alternative.",
+
     "Provide short and simple explanations for each mistake using clear English (B1-B2 level).",
 
     "Do not over-explain. Focus only on important errors.",
@@ -44,6 +48,13 @@ Return output in JSON format:
       "explanation": "<short explanation>"
     }
   ],
+  "improvements": [
+    {
+      "original_phrase": "<original phrasing that could be more natural>",
+      "improved_phrase": "<more natural, idiomatic alternative>",
+      "explanation": "<why the improved version sounds better>"
+    }
+  ],
   "tip": "<one short improvement tip>"
 }
 
@@ -51,6 +62,9 @@ Constraints:
 - JSON must be valid
 - Do not include any text outside JSON
 - Keep explanations concise
+- Only include improvements when there is a meaningful, more natural way to express the same idea
+- If no improvements found, return an empty array for improvements
+- Example improvement: original_phrase="I want to find" improved_phrase="I am looking for"
 """
 
 
