@@ -63,3 +63,24 @@ class SentenceCorrectResponse(BaseModel):
         description="Natural phrase improvements for revision (e.g., 'I want to find' -> 'I am looking for').",
     )
     tip: Optional[str] = Field(None, description="One short improvement tip.")
+
+
+class BatchAnalysisRequest(BaseModel):
+    """Request to generate a batch analysis of unreviewed sentences."""
+
+    max_sentences: int = Field(
+        default=20,
+        ge=1,
+        le=50,
+        description="Maximum number of unanalyzed sentences to include in the report",
+    )
+
+
+class BatchAnalysisResponse(BaseModel):
+    """Response containing a generated markdown analysis report."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(..., description="Unique identifier for this analysis")
+    content: str = Field(..., description="Full markdown content for frontend display")
+    created_at: str = Field(..., description="Timestamp when the analysis was created")
