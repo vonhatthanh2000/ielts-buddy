@@ -1,209 +1,149 @@
-# 🧠 Project Guidelines: IELTS Assistant Backend
+# AI coding guidelines
 
-This document defines the rules and structure that all AI-generated code MUST follow.
-
----
-
-# 📦 Project Structure
-
-The backend follows a layered architecture:
-
-app/
-├── api/ # HTTP layer (FastAPI routes)
-├── agents/ # Phidata AI agents
-├── services/ # Business logic layer
-├── db/ # Database models and connection
-└── main.py # Application entry point
+Repository-specific guardrails for this FastAPI + Supabase IELTS assistant backend.
+Prefer practical consistency with existing modules over abstract patterns.
 
 ---
 
-# 🧩 Layer Responsibilities
+## Current project map
 
-## 1. api/ (API Layer)
-
-Purpose:
-
-- Handle HTTP requests and responses
-- Validate input using Pydantic
-- Return structured JSON responses
-
-Rules:
-
-- ❌ DO NOT write business logic here
-- ❌ DO NOT call database directly
-- ❌ DO NOT implement AI logic here
-- ✅ ONLY call service layer functions
+- `main.py`: app bootstrap, CORS config, router registration, health check.
+- `api/`: HTTP routers and request auth dependency (`deps.py`).
+- `schemas/`: Pydantic request/response models shared across routers.
+- `services/`: business logic (`auth_service`, `user_service`, `sentence_service`).
+- `agents/`: Phidata/OpenAI prompt definitions and agent wiring.
+- `supabase/`: Supabase client singleton and DB access setup.
 
 ---
 
-## 2. services/ (Business Logic Layer)
+## Architecture rules
 
-Purpose:
-
-- Orchestrate application logic
-- Call AI agents
-- Process and transform data
-- Save/retrieve data from database
-
-Rules:
-
-- ✅ This is the ONLY layer that:
-  - calls agents
-  - interacts with database
-- ❌ DO NOT define FastAPI routes
-- ❌ DO NOT define agent prompts here
+- Keep a clean one-way flow: API -> services -> external systems (agent/DB) -> API response.
+- Keep routers thin. Validation and HTTP status mapping belong in `api/`.
+- Keep orchestration in `services/`. This includes parse, transform, and persistence logic.
+- Keep prompts and model setup in `agents/`, not in routers/services.
+- Keep shared contracts in `schemas/` and return schema-compatible data.
 
 ---
 
-## 3. agents/ (AI Layer)
+## Layer responsibilities
 
-Purpose:
+### 1) `api/` (transport layer)
 
-- Define AI behavior using Phidata agents
-- Handle prompt design (description, instructions, expected_output)
+Do:
+- Parse request bodies and path params with schema types.
+- Use `Depends(...)` for auth (`get_current_user_id`) and Supabase client wiring.
+- Raise `HTTPException` with meaningful status codes/messages.
 
-Rules:
+Do not:
+- Perform direct DB table operations.
+- Build prompt text or call agent instances.
+- Embed reusable business logic.
 
-- ❌ DO NOT access database
-- ❌ DO NOT import FastAPI
-- ❌ DO NOT contain business logic
-- ✅ ONLY:
-  - receive input
-  - return structured output
+### 2) `services/` (business layer)
 
----
+Do:
+- Encapsulate auth utilities (hash/verify/decode/create token).
+- Encapsulate user persistence helpers and normalization.
+- Encapsulate sentence correction pipeline: run agent -> parse JSON -> save sentence/mistakes.
 
-## 4. db/ (Data Layer)
+Do not:
+- Define FastAPI routes.
+- Depend on FastAPI request/response objects.
 
-Purpose:
+### 3) `agents/` (AI layer)
 
-- Define database schema
-- Manage database connection
+Do:
+- Define `description`, `instructions`, and `expected_output`.
+- Return strict JSON-only output consumable by services.
+- Keep instruction text concise and deterministic.
 
-Files:
+Do not:
+- Access Supabase or any DB client.
+- Raise HTTP-specific errors.
+- Implement persistence/orchestration logic.
 
-- models.py → SQLAlchemy models
-- connection.py → DB session setup
+### 4) `supabase/` (infrastructure layer)
 
-Rules:
+Do:
+- Expose a singleton `get_supabase()` client for dependency injection.
+- Keep environment resolution (`SUPABASE_URL`, service key aliasing) centralized.
 
-- ❌ DO NOT include business logic
-- ❌ DO NOT call AI agents
-
----
-
-## 5. main.py (Entry Point)
-
-Purpose:
-
-- Initialize FastAPI app
-- Register API routers
-
-Rules:
-
-- ❌ DO NOT include business logic
-- ❌ DO NOT call agents directly
+Do not:
+- Mix feature logic into client initialization.
 
 ---
 
-# 🔄 Data Flow (STRICT)
+## Feature flows in this repository
 
-All features MUST follow this flow:
+### Auth flow (`/v1/auth`)
 
-API → Service → Agent → Service → DB → API Response
+1. API validates input and normalizes username.
+2. Service hashes/verifies password and issues JWT session token.
+3. User service reads/writes `users` in Supabase.
+4. API returns `LoginResponse`/errors.
 
----
+### User flow (`/v1/users`)
 
-# 🧠 AI Agent Rules (Phidata)
+1. API extracts bearer token via `get_current_user_id`.
+2. User service fetches user rows by id/username.
+3. API maps missing rows to `404`.
 
-Each agent MUST include:
+### Sentence correction flow (`/v1/sentence/correct`)
 
-- description
-- instructions (list of strings)
-- expected_output (strict JSON format)
+1. API validates request and auth.
+2. Sentence service calls `sentence_correct_agent`.
+3. Service parses agent JSON and computes `has_mistakes`.
+4. Service persists sentence and mistake rows in Supabase.
+5. API returns `SentenceCorrectResponse`.
 
-Rules:
-
-- Output MUST be valid JSON
-- No extra text outside JSON
-- Must be API-friendly
-
----
-
-# 🧾 Database Rules
-
-## sentences table:
-
-- original (TEXT, NOT NULL)
-- corrected (TEXT, NOT NULL)
-- natural (TEXT, NOT NULL)
-- has_mistakes (BOOLEAN)
-
-## sentence_mistakes table:
-
-- type (grammar | word_choice | fluency)
-- original
-- fix
-- explanation
-
-Rules:
-
-- ❌ DO NOT store mistakes as JSON in sentences table
-- ✅ Use separate table for normalization
+Note: not every feature requires an agent call (auth/user routes currently do not).
 
 ---
 
-# ⚠️ Error Handling Rules
+## Data and contract rules
 
-- API layer must return HTTPException on failure
-- Service layer should handle parsing/logic errors
-- Agent layer should NEVER crash the system
-
----
-
-# 🧼 Code Style Rules
-
-- Use clear function names
-- Keep functions small and focused
-- Use type hints where possible
-- Avoid duplication
+- Agent output must be valid JSON with no surrounding prose.
+- Service layer must tolerate malformed agent output and provide safe fallback values.
+- API responses should always be serializable by schema models (`model_validate` where applicable).
+- Normalize usernames as lowercase before lookup/insert.
+- JWT payload must include a string `sub` (user id).
 
 ---
 
-# 🚫 Anti-Patterns (STRICTLY FORBIDDEN)
+## Error handling rules
 
-- ❌ Calling agent directly inside API
-- ❌ Writing SQL inside API files
-- ❌ Mixing AI logic with database logic
-- ❌ Returning unstructured text from agents
-
----
-
-# ✅ Example Flow (Sentence Correction)
-
-1. API receives request
-2. API calls sentence_service.correct_sentence()
-3. Service calls correction_agent
-4. Service parses output
-5. Service saves to DB
-6. API returns response
+- `api/`: map known failures to correct HTTP codes (`400`, `401`, `404`, `409`, `500`).
+- `services/`: raise domain/runtime errors with actionable messages.
+- `agents/`: never assume model output is perfect; service must validate and sanitize.
+- Avoid leaking sensitive secrets or full internal traces in API error details.
 
 ---
 
-# 🎯 Goal
+## Code style and maintenance
 
-Build a scalable IELTS assistant backend with:
-
-- clean architecture
-- reusable AI agents
-- structured data
-- future support for personalization (vector DB)
+- Use type hints for public functions and key helpers.
+- Keep functions focused and small; extract helpers for repeated logic.
+- Reuse existing modules before creating new abstractions.
+- Favor explicit names: `get_user_by_username`, `create_session_token`, `correct_sentence`.
+- Add concise comments only where non-obvious behavior exists.
 
 ---
 
-# 🔥 Final Rule
+## Anti-patterns (forbidden)
+
+- Calling agent directly from `api/`.
+- Running Supabase queries directly from routers.
+- Duplicating token parsing logic outside `api/deps.py` + `services/auth_service.py`.
+- Returning non-JSON agent output and parsing it in routers.
+- Mixing prompt definitions into service files.
+
+---
+
+## Final rule
 
 If unsure:
-→ Keep layers separated
-→ Keep output structured
-→ Keep logic inside services
+- keep boundaries strict,
+- keep outputs structured,
+- keep orchestration in `services/`,
+- keep transport concerns in `api/`.

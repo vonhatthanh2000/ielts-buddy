@@ -3,3 +3,5 @@
 # Secrets and local config (never commit real URLs or keys)
 .env
 .env.local
+
+.claude/settings.local.json
