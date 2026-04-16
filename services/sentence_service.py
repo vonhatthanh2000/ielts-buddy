@@ -1,5 +1,4 @@
 import json
-from datetime import datetime, timezone
 
 from supabase.client import Client
 
@@ -102,7 +101,7 @@ def generate_batch_analysis(
     supabase: Client,
     user_id: str,
     max_sentences: int = 20,
-) -> dict:
+) -> str:
     """
     Generate a markdown analysis report of unanalyzed sentences.
 
@@ -110,7 +109,7 @@ def generate_batch_analysis(
     calls the batch analysis agent to generate a report, saves it,
     and marks the sentences as analyzed.
 
-    Returns the saved analysis record.
+    Returns the analysis ID.
     """
     # Fetch unanalyzed sentences
     sentences = _fetch_unanalyzed_sentences(supabase, user_id, max_sentences)
@@ -130,11 +129,7 @@ def generate_batch_analysis(
     # Mark sentences as analyzed
     _mark_sentences_analyzed(supabase, sentence_ids)
 
-    return {
-        "id": analysis_id,
-        "content": markdown_content,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
+    return analysis_id
 
 
 def _fetch_unanalyzed_sentences(

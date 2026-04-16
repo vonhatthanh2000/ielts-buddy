@@ -45,18 +45,26 @@ Return output as a markdown string (not JSON). Format:
 # Writing Analysis Report
 
 ## Executive Summary
-Brief overview of the batch: X sentences analyzed, Y mistakes found, Z improvements suggested.
-Key patterns observed.
+- X sentences analyzed 
+- Y mistakes found
+- Z improvements suggested.
+
 
 ## Mistake Analysis
 
 ### [Category 1: e.g., Grammar - Articles]
-- **Issue**: Description of the pattern
-- **Examples**:
-  - Original: "..."
-  - Correction: "..."
-  - Why: Brief explanation
-- **How to Fix**: Specific advice
+**Issue**: Description of the pattern
+**Examples**:
+  - **Example 1:**
+    - Original: "..."
+    - Correction: "..."
+    - Why: Brief explanation
+
+  - **Example 2:**
+    - Original: "..." 
+    - Correction: "..."
+    - Why: Brief explanation
+**How to Fix**: Specific advice
 
 ### [Category 2: e.g., Word Choice]
 ...
@@ -83,8 +91,6 @@ Key patterns observed.
 Brief encouraging message with guidance for the next writing session.
 
 ---
-Generated on: [timestamp]
-Sentences analyzed: [count]
 
 Constraints:
 - Output must be valid markdown
