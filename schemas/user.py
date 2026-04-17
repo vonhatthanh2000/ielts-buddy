@@ -12,6 +12,7 @@ class UserResponse(BaseModel):
 
     id: str = Field(..., description="Primary key (uuid as string).")
     username: Optional[str] = Field(None, description="Login handle (unique).")
+    email: Optional[str] = Field(None, description="Account email (unique, lowercase).")
     name: Optional[str] = Field(None, description="Display name (optional if not stored).")
     created_at: Optional[str] = Field(
         None, description="ISO-8601 timestamp from Postgres, if present."

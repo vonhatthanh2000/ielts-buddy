@@ -2,18 +2,22 @@
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
-
-from schemas.user import UserResponse
+from pydantic import BaseModel, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
-    username: str = Field(..., min_length=1, max_length=200)
+    username: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Username or email (email matched case-insensitively).",
+    )
     password: str = Field(..., min_length=1, max_length=500)
 
 
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=200)
+    email: EmailStr = Field(..., max_length=320)
     password: str = Field(..., min_length=1, max_length=500)
     name: Optional[str] = Field(
         default=None,
@@ -23,18 +27,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    """Session JWT and profile so the client can log in without an extra ``/users/me`` call."""
-
     access_token: str = Field(
         ...,
-        description="Signed JWT (Bearer). This is not the server SESSION_SECRET.",
-    )
-    token_type: str = "bearer"
-    expires_in: int = Field(
-        ...,
-        description="Token lifetime in seconds (30 days).",
-    )
-    user: Optional[UserResponse] = Field(
-        default=None,
-        description="Current user profile; set on register and login.",
+        description="Signed JWT; send as Authorization: Bearer <token>.",
     )

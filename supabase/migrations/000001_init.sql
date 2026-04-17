@@ -7,13 +7,15 @@
 CREATE TABLE IF NOT EXISTS public.users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at timestamptz NOT NULL DEFAULT now(),
-    username text NOT NULL,
+    username text,
+    email text NOT NULL,
     password_hash text NOT NULL,
     name text NOT NULL,
-    CONSTRAINT users_username_unique UNIQUE (username)
+    CONSTRAINT users_username_unique UNIQUE (username),
+    CONSTRAINT users_email_unique UNIQUE (email)
 );
 
-COMMENT ON TABLE public.users IS 'Application accounts; usernames should be stored lowercase.';
+COMMENT ON TABLE public.users IS 'Application accounts; usernames and emails should be stored lowercase.';
 
 -- ---------------------------------------------------------------------------
 -- 2. sentences
