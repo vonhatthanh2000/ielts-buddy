@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 
 from supabase.client import Client
 
@@ -90,6 +91,107 @@ def _save(data: dict, supabase: Client, user_id: str) -> None:
             for imp in improvements
         ]
         supabase.table("sentence_improvements").insert(improvement_payload).execute()
+
+
+# ---------------------------------------------------------------------------
+# History & detail (read)
+# ---------------------------------------------------------------------------
+
+
+def list_user_sentences(
+    supabase: Client,
+    user_id: str,
+    *,
+    page: int = 0,
+    page_size: int = 20,
+) -> dict:
+    """Paginated sentences for a user, newest first. ``page`` is 0-based."""
+    page = max(0, page)
+    page_size = min(max(1, page_size), 100)
+    offset = page * page_size
+    end = offset + page_size - 1
+
+    res = (
+        supabase.table("sentences")
+        .select(
+            "id, created_at, original, corrected, natural, has_mistakes",
+            count="exact",
+        )
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .range(offset, end)
+        .execute()
+    )
+    rows = res.data or []
+    total = int(res.count) if res.count is not None else len(rows)
+    return {
+        "items": rows,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def get_user_sentence_detail(
+    supabase: Client,
+    user_id: str,
+    sentence_id: str,
+) -> Optional[dict]:
+    """
+    Load one sentence with mistakes and improvements, same shape as ``correct_sentence``
+    output (``tip`` always ``None`` here; not persisted).
+    """
+    sres = (
+        supabase.table("sentences")
+        .select("id, original, corrected, natural, has_mistakes")
+        .eq("id", sentence_id)
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    if not sres.data:
+        return None
+    row = sres.data[0]
+
+    mres = (
+        supabase.table("sentence_mistakes")
+        .select("type, original, fix, explanation")
+        .eq("sentence_id", sentence_id)
+        .execute()
+    )
+    ires = (
+        supabase.table("sentence_improvements")
+        .select("original_phrase, improved_phrase, explanation")
+        .eq("sentence_id", sentence_id)
+        .execute()
+    )
+
+    mistakes = []
+    for m in mres.data or []:
+        mistakes.append({
+            "type": m.get("type") or "",
+            "original": m.get("original"),
+            "fix": m.get("fix"),
+            "explanation": m.get("explanation"),
+        })
+
+    improvements = []
+    for imp in ires.data or []:
+        improvements.append({
+            "original_phrase": imp.get("original_phrase") or "",
+            "improved_phrase": imp.get("improved_phrase") or "",
+            "explanation": imp.get("explanation"),
+        })
+
+    return {
+        "original": row.get("original", ""),
+        "corrected": row.get("corrected", ""),
+        "natural": row.get("natural", ""),
+        "has_mistakes": bool(row.get("has_mistakes", False)),
+        "mistakes": mistakes,
+        "improvements": improvements,
+        "tip": None,
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -84,3 +84,23 @@ class BatchAnalysisResponse(BaseModel):
     id: str = Field(..., description="Unique identifier for this analysis")
     content: str = Field(..., description="Full markdown content for frontend display")
     created_at: str = Field(..., description="Timestamp when the analysis was created")
+
+
+class SentenceHistoryItem(BaseModel):
+    """One saved sentence row (list view; no nested mistakes)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    created_at: Optional[str] = None
+    original: str
+    corrected: str
+    natural: str
+    has_mistakes: bool
+
+
+class SentenceHistoryResponse(BaseModel):
+    items: List[SentenceHistoryItem]
+    total: int
+    page: int = Field(..., description="0-based page index echoed from the request.")
+    page_size: int

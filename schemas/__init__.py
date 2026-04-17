@@ -11,6 +11,8 @@ from schemas.sentence import (
     BatchAnalysisResponse,
     ImprovementItem,
     SentenceCorrectResponse,
+    SentenceHistoryItem,
+    SentenceHistoryResponse,
     SentenceMistakeItem,
     SentenceRequest,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "LoginResponse",
     "RegisterRequest",
     "SentenceCorrectResponse",
+    "SentenceHistoryItem",
+    "SentenceHistoryResponse",
     "SentenceMistakeItem",
     "SentenceRequest",
     "UserResponse",
