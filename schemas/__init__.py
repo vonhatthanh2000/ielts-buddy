@@ -6,6 +6,12 @@ submodules ``schemas.sentence``, ``schemas.user``.
 """
 
 from schemas.auth import LoginRequest, LoginResponse, RegisterRequest
+from schemas.profile import (
+    ProfileCreate,
+    ProfileListResponse,
+    ProfileResponse,
+    ProfileUpdate,
+)
 from schemas.sentence import (
     BatchAnalysisRequest,
     BatchAnalysisResponse,
@@ -24,6 +30,10 @@ __all__ = [
     "ImprovementItem",
     "LoginRequest",
     "LoginResponse",
+    "ProfileCreate",
+    "ProfileListResponse",
+    "ProfileResponse",
+    "ProfileUpdate",
     "RegisterRequest",
     "SentenceCorrectResponse",
     "SentenceHistoryItem",

@@ -7,13 +7,13 @@ from agents.sentence_correct_agent import sentence_correct_agent
 from agents.batch_analysis_agent import batch_analysis_agent
 
 
-def correct_sentence(text: str, supabase: Client, user_id: str) -> dict:
+def correct_sentence(text: str, supabase: Client, profile_id: str) -> dict:
     """
     Full pipeline: call agent → parse output → save to Supabase → return result.
     """
     raw = _run_agent(text)
     parsed = _parse_output(text, raw)
-    _save(parsed, supabase, user_id)
+    _save(parsed, supabase, profile_id)
     return parsed
 
 
@@ -49,9 +49,9 @@ def _parse_output(original_text: str, raw: str) -> dict:
     return data
 
 
-def _save(data: dict, supabase: Client, user_id: str) -> None:
+def _save(data: dict, supabase: Client, profile_id: str) -> None:
     row = {
-        "user_id": user_id,
+        "profile_id": profile_id,
         "original": data.get("original", ""),
         "corrected": data.get("corrected", ""),
         "natural": data.get("natural", ""),
@@ -98,14 +98,14 @@ def _save(data: dict, supabase: Client, user_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def list_user_sentences(
+def list_profile_sentences(
     supabase: Client,
-    user_id: str,
+    profile_id: str,
     *,
     page: int = 0,
     page_size: int = 20,
 ) -> dict:
-    """Paginated sentences for a user, newest first. ``page`` is 0-based."""
+    """Paginated sentences for a profile, newest first. ``page`` is 0-based."""
     page = max(0, page)
     page_size = min(max(1, page_size), 100)
     offset = page * page_size
@@ -117,7 +117,7 @@ def list_user_sentences(
             "id, created_at, original, corrected, natural, has_mistakes",
             count="exact",
         )
-        .eq("user_id", user_id)
+        .eq("profile_id", profile_id)
         .order("created_at", desc=True)
         .range(offset, end)
         .execute()
@@ -132,9 +132,9 @@ def list_user_sentences(
     }
 
 
-def get_user_sentence_detail(
+def get_profile_sentence_detail(
     supabase: Client,
-    user_id: str,
+    profile_id: str,
     sentence_id: str,
 ) -> Optional[dict]:
     """
@@ -145,7 +145,7 @@ def get_user_sentence_detail(
         supabase.table("sentences")
         .select("id, original, corrected, natural, has_mistakes")
         .eq("id", sentence_id)
-        .eq("user_id", user_id)
+        .eq("profile_id", profile_id)
         .limit(1)
         .execute()
     )
@@ -201,7 +201,7 @@ def get_user_sentence_detail(
 
 def generate_batch_analysis(
     supabase: Client,
-    user_id: str,
+    profile_id: str,
     max_sentences: int = 20,
 ) -> str:
     """
@@ -214,7 +214,7 @@ def generate_batch_analysis(
     Returns the analysis ID.
     """
     # Fetch unanalyzed sentences
-    sentences = _fetch_unanalyzed_sentences(supabase, user_id, max_sentences)
+    sentences = _fetch_unanalyzed_sentences(supabase, profile_id, max_sentences)
 
     if not sentences:
         raise ValueError("No unanalyzed sentences found")
@@ -226,7 +226,7 @@ def generate_batch_analysis(
     sentence_ids = [s["id"] for s in sentences]
 
     # Save analysis (just store the markdown content)
-    analysis_id = _save_analysis(supabase, user_id, markdown_content)
+    analysis_id = _save_analysis(supabase, profile_id, markdown_content)
 
     # Mark sentences as analyzed
     _mark_sentences_analyzed(supabase, sentence_ids)
@@ -235,14 +235,14 @@ def generate_batch_analysis(
 
 
 def _fetch_unanalyzed_sentences(
-    supabase: Client, user_id: str, limit: int
+    supabase: Client, profile_id: str, limit: int
 ) -> list[dict]:
     """Fetch unanalyzed sentences with their mistakes and improvements."""
     # Fetch unanalyzed sentences
     res = (
         supabase.table("sentences")
         .select("id, original, corrected, natural, has_mistakes, created_at")
-        .eq("user_id", user_id)
+        .eq("profile_id", profile_id)
         .eq("analyzed", False)
         .order("created_at", desc=False)  # Oldest first
         .limit(limit)
@@ -351,10 +351,10 @@ def _build_batch_analysis_prompt(sentences: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _save_analysis(supabase: Client, user_id: str, content: str) -> str:
+def _save_analysis(supabase: Client, profile_id: str, content: str) -> str:
     """Save the analysis report to the database."""
     row = {
-        "user_id": user_id,
+        "profile_id": profile_id,
         "content": content,
     }
 
