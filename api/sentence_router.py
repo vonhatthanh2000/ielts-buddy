@@ -1,10 +1,12 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps import get_current_profile_id
 from schemas import (
+    BatchAnalysisListResponse,
     BatchAnalysisRequest,
+    BatchAnalysisResponse,
     SentenceCorrectResponse,
     SentenceHistoryResponse,
     SentenceRequest,
@@ -13,7 +15,9 @@ from supabase.client import Client, get_supabase
 from services.sentence_service import (
     correct_sentence,
     generate_batch_analysis,
+    get_profile_sentence_analysis_detail,
     get_profile_sentence_detail,
+    list_profile_sentence_analyses,
     list_profile_sentences,
 )
 
@@ -31,18 +35,6 @@ def sentence_history(
     return SentenceHistoryResponse.model_validate(raw)
 
 
-@router.get("/{sentence_id}", response_model=SentenceCorrectResponse)
-def sentence_detail(
-    sentence_id: UUID,
-    supabase: Client = Depends(get_supabase),
-    profile_id: str = Depends(get_current_profile_id),
-) -> SentenceCorrectResponse:
-    raw = get_profile_sentence_detail(supabase, profile_id, str(sentence_id))
-    if raw is None:
-        raise HTTPException(status_code=404, detail="Sentence not found")
-    return SentenceCorrectResponse.model_validate(raw)
-
-
 @router.post("/correct", response_model=SentenceCorrectResponse)
 def sentence_correct(
     body: SentenceRequest,
@@ -56,12 +48,12 @@ def sentence_correct(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.post("/analyze", status_code=204)
+@router.post("/analyze", response_model=BatchAnalysisResponse)
 def analyze_batch(
     body: BatchAnalysisRequest,
     supabase: Client = Depends(get_supabase),
     profile_id: str = Depends(get_current_profile_id),
-) -> Response:
+) -> BatchAnalysisResponse:
     """
     Generate a markdown analysis report of unreviewed sentences.
 
@@ -69,17 +61,56 @@ def analyze_batch(
     and improvements, generates a comprehensive markdown report via AI,
     stores it in `sentence_analyses`, and marks the sentences as analyzed.
 
-    Returns 204 No Content on success. The analysis is saved to the database
-    and can be fetched separately if needed.
+    Returns the saved analysis report payload.
     """
     try:
-        generate_batch_analysis(
+        raw = generate_batch_analysis(
             supabase,
             profile_id,
             max_sentences=body.max_sentences,
         )
-        return Response(status_code=204)
+        return BatchAnalysisResponse.model_validate(raw)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.get("/analyses", response_model=BatchAnalysisListResponse)
+def list_batch_analyses(
+    supabase: Client = Depends(get_supabase),
+    profile_id: str = Depends(get_current_profile_id),
+    page: int = Query(0, ge=0, description="First page is 0."),
+    page_size: int = Query(20, ge=1, le=100),
+) -> BatchAnalysisListResponse:
+    raw = list_profile_sentence_analyses(
+        supabase,
+        profile_id,
+        page=page,
+        page_size=page_size,
+    )
+    return BatchAnalysisListResponse.model_validate(raw)
+
+
+@router.get("/analyses/{analysis_id}", response_model=BatchAnalysisResponse)
+def batch_analysis_detail(
+    analysis_id: UUID,
+    supabase: Client = Depends(get_supabase),
+    profile_id: str = Depends(get_current_profile_id),
+) -> BatchAnalysisResponse:
+    raw = get_profile_sentence_analysis_detail(supabase, profile_id, str(analysis_id))
+    if raw is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return BatchAnalysisResponse.model_validate(raw)
+
+
+@router.get("/{sentence_id}", response_model=SentenceCorrectResponse)
+def sentence_detail(
+    sentence_id: UUID,
+    supabase: Client = Depends(get_supabase),
+    profile_id: str = Depends(get_current_profile_id),
+) -> SentenceCorrectResponse:
+    raw = get_profile_sentence_detail(supabase, profile_id, str(sentence_id))
+    if raw is None:
+        raise HTTPException(status_code=404, detail="Sentence not found")
+    return SentenceCorrectResponse.model_validate(raw)

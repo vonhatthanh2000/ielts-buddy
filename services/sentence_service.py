@@ -114,7 +114,7 @@ def list_profile_sentences(
     res = (
         supabase.table("sentences")
         .select(
-            "id, created_at, original, corrected, natural, has_mistakes",
+            "id, created_at, original, corrected, natural, has_mistakes, analyzed",
             count="exact",
         )
         .eq("profile_id", profile_id)
@@ -203,7 +203,7 @@ def generate_batch_analysis(
     supabase: Client,
     profile_id: str,
     max_sentences: int = 20,
-) -> str:
+) -> dict:
     """
     Generate a markdown analysis report of unanalyzed sentences.
 
@@ -211,7 +211,7 @@ def generate_batch_analysis(
     calls the batch analysis agent to generate a report, saves it,
     and marks the sentences as analyzed.
 
-    Returns the analysis ID.
+    Returns the saved analysis payload.
     """
     # Fetch unanalyzed sentences
     sentences = _fetch_unanalyzed_sentences(supabase, profile_id, max_sentences)
@@ -226,12 +226,12 @@ def generate_batch_analysis(
     sentence_ids = [s["id"] for s in sentences]
 
     # Save analysis (just store the markdown content)
-    analysis_id = _save_analysis(supabase, profile_id, markdown_content)
+    analysis = _save_analysis(supabase, profile_id, markdown_content)
 
     # Mark sentences as analyzed
     _mark_sentences_analyzed(supabase, sentence_ids)
 
-    return analysis_id
+    return analysis
 
 
 def _fetch_unanalyzed_sentences(
@@ -351,7 +351,7 @@ def _build_batch_analysis_prompt(sentences: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _save_analysis(supabase: Client, profile_id: str, content: str) -> str:
+def _save_analysis(supabase: Client, profile_id: str, content: str) -> dict:
     """Save the analysis report to the database."""
     row = {
         "profile_id": profile_id,
@@ -362,7 +362,23 @@ def _save_analysis(supabase: Client, profile_id: str, content: str) -> str:
     if not res.data:
         raise RuntimeError("Failed to save analysis")
 
-    return res.data[0]["id"]
+    inserted = res.data[0]
+    analysis_id = inserted.get("id")
+    if not analysis_id:
+        raise RuntimeError("Saved analysis is missing id")
+
+    detail = (
+        supabase.table("sentence_analyses")
+        .select("id, content, created_at")
+        .eq("id", analysis_id)
+        .eq("profile_id", profile_id)
+        .limit(1)
+        .execute()
+    )
+    if not detail.data:
+        raise RuntimeError("Saved analysis could not be loaded")
+
+    return detail.data[0]
 
 
 def _mark_sentences_analyzed(supabase: Client, sentence_ids: list[str]) -> None:
@@ -375,3 +391,53 @@ def _mark_sentences_analyzed(supabase: Client, sentence_ids: list[str]) -> None:
     # so we do it one by one or use RPC if needed
     for sid in sentence_ids:
         supabase.table("sentences").update({"analyzed": True}).eq("id", sid).execute()
+
+
+def list_profile_sentence_analyses(
+    supabase: Client,
+    profile_id: str,
+    *,
+    page: int = 0,
+    page_size: int = 20,
+) -> dict:
+    """Paginated sentence batch analyses for a profile, newest first."""
+    page = max(0, page)
+    page_size = min(max(1, page_size), 100)
+    offset = page * page_size
+    end = offset + page_size - 1
+
+    res = (
+        supabase.table("sentence_analyses")
+        .select("id, content, created_at", count="exact")
+        .eq("profile_id", profile_id)
+        .order("created_at", desc=True)
+        .range(offset, end)
+        .execute()
+    )
+    rows = res.data or []
+    total = int(res.count) if res.count is not None else len(rows)
+    return {
+        "items": rows,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+def get_profile_sentence_analysis_detail(
+    supabase: Client,
+    profile_id: str,
+    analysis_id: str,
+) -> Optional[dict]:
+    """Load one sentence batch analysis for a profile."""
+    res = (
+        supabase.table("sentence_analyses")
+        .select("id, content, created_at")
+        .eq("id", analysis_id)
+        .eq("profile_id", profile_id)
+        .limit(1)
+        .execute()
+    )
+    if not res.data:
+        return None
+    return res.data[0]

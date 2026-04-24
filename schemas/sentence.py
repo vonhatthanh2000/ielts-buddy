@@ -86,6 +86,15 @@ class BatchAnalysisResponse(BaseModel):
     created_at: str = Field(..., description="Timestamp when the analysis was created")
 
 
+class BatchAnalysisListResponse(BaseModel):
+    """Paginated list of generated batch analyses."""
+
+    items: List[BatchAnalysisResponse]
+    total: int
+    page: int = Field(..., description="0-based page index echoed from the request.")
+    page_size: int
+
+
 class SentenceHistoryItem(BaseModel):
     """One saved sentence row (list view; no nested mistakes)."""
 
@@ -97,6 +106,10 @@ class SentenceHistoryItem(BaseModel):
     corrected: str
     natural: str
     has_mistakes: bool
+    analyzed: bool = Field(
+        default=False,
+        description="True when this sentence has been included in a batch analysis.",
+    )
 
 
 class SentenceHistoryResponse(BaseModel):

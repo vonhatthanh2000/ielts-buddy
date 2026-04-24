@@ -13,6 +13,7 @@ from schemas.profile import (
     ProfileUpdate,
 )
 from schemas.sentence import (
+    BatchAnalysisListResponse,
     BatchAnalysisRequest,
     BatchAnalysisResponse,
     ImprovementItem,
@@ -25,6 +26,7 @@ from schemas.sentence import (
 from schemas.user import UserResponse
 
 __all__ = [
+    "BatchAnalysisListResponse",
     "BatchAnalysisRequest",
     "BatchAnalysisResponse",
     "ImprovementItem",
