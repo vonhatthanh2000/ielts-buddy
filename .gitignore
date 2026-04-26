@@ -1,5 +1,11 @@
 .venv/
 
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
 # Secrets and local config (never commit real URLs or keys)
 .env
 .env.local

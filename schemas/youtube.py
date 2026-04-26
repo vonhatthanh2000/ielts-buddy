@@ -54,6 +54,7 @@ class YoutubeAnalysisResponse(BaseModel):
 
     video_title: str = Field(..., description="Title of the video (if available).")
     video_url: str = Field(..., description="The YouTube URL that was analyzed.")
+    transcript: str = Field(..., description="The full transcript text extracted from the video.")
     useful_sentences: List[UsefulSentenceItem] = Field(
         default_factory=list,
         description="Useful sentences demonstrating natural spoken English.",

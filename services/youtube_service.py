@@ -23,12 +23,12 @@ def analyze_youtube_video(
     if not video_id:
         raise ValueError("Invalid YouTube URL. Could not extract video ID.")
 
-    # Fetch transcript (captions first, MLX fallback)
-    transcript, video_title, used_mlx = _fetch_transcript_with_fallback(video_id, url)
+    # Download audio and transcribe with MLX Whisper
+    transcript, video_title, used_mlx = _transcribe_with_mlx(video_id, url)
     if not transcript:
         raise ValueError(
-            "Could not fetch transcript. Video may not have captions available, "
-            "and MLX transcription is unavailable (requires Apple Silicon)."
+            "Could not transcribe video. MLX transcription failed or is unavailable "
+            "(requires Apple Silicon Mac with mlx-whisper installed)."
         )
 
     # Use extracted title or placeholder
@@ -37,7 +37,7 @@ def analyze_youtube_video(
 
     # Run agent analysis
     raw = _run_agent(transcript)
-    parsed = _parse_output(url, video_title, raw)
+    parsed = _parse_output(url, video_title, transcript, raw)
 
     # TODO: Re-enable after testing
     # Save to database
@@ -70,93 +70,29 @@ def _extract_video_id(url: str) -> Optional[str]:
     return None
 
 
-def _fetch_transcript_with_fallback(
-    video_id: str, url: str
-) -> tuple[Optional[str], Optional[str], bool]:
-    """
-    Fetch transcript with fallback to MLX transcription.
-
-    Returns: (transcript, video_title, used_mlx)
-    - First tries YouTube captions via youtube-transcript-api
-    - Falls back to downloading audio and transcribing with mlx-whisper
-    """
-    import logging
-    logger = logging.getLogger(__name__)
-
-    # Try 1: Check if English transcript exists and fetch it
-    try:
-        from youtube_transcript_api import YouTubeTranscriptApi
-
-        ytt_api = YouTubeTranscriptApi()
-
-        # First, check what transcripts are available
-        try:
-            transcript_list = ytt_api.list(video_id)
-        except Exception as e:
-            logger.warning(f"Could not list transcripts for {video_id}: {e}")
-            # If we can't list, try MLX directly
-            return _transcribe_with_mlx(video_id, url)
-
-        # Check if English transcript exists (manually created or generated)
-        english_transcript = None
-        try:
-            # Try to find English transcript directly
-            english_transcript = transcript_list.find_transcript(['en'])
-        except Exception:
-            # No English transcript found - check if we can translate to English
-            logger.info(f"No direct English transcript for {video_id}, checking translation options")
-            try:
-                # Find any transcript that can be translated to English
-                for transcript in transcript_list:
-                    if transcript.is_translatable:
-                        # Check if English is in translation languages
-                        translatable_codes = [lang.language_code for lang in transcript.translation_languages]
-                        if 'en' in translatable_codes:
-                            logger.info(f"Found {transcript.language_code} transcript, translating to English")
-                            english_transcript = transcript.translate('en')
-                            break
-            except Exception as trans_e:
-                logger.warning(f"Could not find translatable transcript: {trans_e}")
-
-        if english_transcript is None:
-            logger.info(f"No English transcript available for {video_id}, using MLX transcription")
-            return _transcribe_with_mlx(video_id, url)
-
-        # Fetch the English transcript
-        fetched = english_transcript.fetch()
-        full_text = ' '.join(segment.text for segment in fetched)
-        logger.info(f"Successfully fetched English captions for video {video_id}")
-        return full_text, None, False
-
-    except Exception as e:
-        logger.warning(f"youtube-transcript-api failed for {video_id}: {type(e).__name__}: {e}")
-        # Fall through to MLX
-
-    # Try 2: MLX Whisper transcription (requires Apple Silicon)
-    try:
-        return _transcribe_with_mlx(video_id, url)
-    except Exception as e:
-        logger.error(f"MLX transcription failed for {video_id}: {type(e).__name__}: {e}")
-        return None, None, False
-
-
 def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Optional[str], bool]:
     """
     Download YouTube audio and transcribe using MLX Whisper.
 
     Returns: (transcript, video_title, used_mlx=True)
     """
+    import logging
     import subprocess
+
+    logger = logging.getLogger(__name__)
 
     # Check if mlx_whisper is available
     try:
         import mlx_whisper
-    except ImportError:
+        logger.info("mlx_whisper imported successfully")
+    except ImportError as e:
+        logger.error(f"mlx_whisper not available: {e}")
         return None, None, False
 
     # Create temp directory for audio download
     with tempfile.TemporaryDirectory() as tmpdir:
         audio_path = os.path.join(tmpdir, f"{video_id}.m4a")
+        logger.info(f"Downloading audio to {audio_path}")
 
         # Download audio using yt-dlp
         try:
@@ -166,7 +102,6 @@ def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Option
                     "-f", "bestaudio[ext=m4a]/bestaudio",
                     "-o", audio_path,
                     "--no-playlist",
-                    "--quiet",
                     url,
                 ],
                 capture_output=True,
@@ -174,13 +109,21 @@ def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Option
                 timeout=120,
             )
             if result.returncode != 0:
+                logger.error(f"yt-dlp failed: {result.stderr}")
                 return None, None, False
-        except (subprocess.TimeoutExpired, FileNotFoundError):
+            logger.info("yt-dlp download successful")
+        except subprocess.TimeoutExpired:
+            logger.error("yt-dlp timed out after 120 seconds")
+            return None, None, False
+        except FileNotFoundError:
+            logger.error("yt-dlp not found. Install with: pip install yt-dlp")
             return None, None, False
 
         # Check if file was downloaded
         if not os.path.exists(audio_path):
+            logger.error(f"Audio file not found at {audio_path}")
             return None, None, False
+        logger.info(f"Audio file exists, size: {os.path.getsize(audio_path)} bytes")
 
         # Get video title from yt-dlp
         video_title = None
@@ -203,14 +146,17 @@ def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Option
 
         # Transcribe with MLX Whisper
         try:
+            logger.info(f"Starting MLX transcription for {video_id}")
             result = mlx_whisper.transcribe(
                 audio_path,
                 path_or_hf_repo="mlx-community/whisper-large-v3-turbo",
                 verbose=False,
             )
             transcript = result.get("text", "").strip()
+            logger.info(f"MLX transcription successful, got {len(transcript)} characters")
             return transcript, video_title, True
-        except Exception:
+        except Exception as e:
+            logger.error(f"MLX transcription failed: {type(e).__name__}: {e}")
             return None, None, False
 
 
@@ -238,7 +184,7 @@ def _run_agent(transcript: str) -> str:
     return response.content if hasattr(response, "content") else str(response)
 
 
-def _parse_output(url: str, video_title: str, raw: str) -> dict:
+def _parse_output(url: str, video_title: str, transcript: str, raw: str) -> dict:
     """Parse agent output into structured data."""
     try:
         data = json.loads(raw)
@@ -246,6 +192,7 @@ def _parse_output(url: str, video_title: str, raw: str) -> dict:
         return {
             "video_title": video_title,
             "video_url": url,
+            "transcript": transcript,
             "useful_sentences": [],
             "grammar_patterns": [],
             "everyday_phrases": [],
@@ -256,6 +203,7 @@ def _parse_output(url: str, video_title: str, raw: str) -> dict:
     result = {
         "video_title": data.get("video_title", video_title),
         "video_url": url,
+        "transcript": transcript,
         "useful_sentences": data.get("useful_sentences", []),
         "grammar_patterns": data.get("grammar_patterns", []),
         "everyday_phrases": data.get("everyday_phrases", []),
