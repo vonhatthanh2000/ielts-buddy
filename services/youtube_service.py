@@ -39,9 +39,7 @@ def analyze_youtube_video(
     raw = _run_agent(transcript)
     parsed = _parse_output(url, video_title, transcript, raw)
 
-    # TODO: Re-enable after testing
-    # Save to database
-    # _save(parsed, supabase, profile_id)
+    _save(parsed, supabase, profile_id)
 
     return parsed
 
@@ -94,6 +92,28 @@ def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Option
         audio_path = os.path.join(tmpdir, f"{video_id}.m4a")
         logger.info(f"Downloading audio to {audio_path}")
 
+        # Download audio and get video title in one yt-dlp call
+        video_title = None
+        try:
+            # First, get video info without downloading to extract title
+            info_result = subprocess.run(
+                [
+                    "yt-dlp",
+                    "--print", "%(title)s",
+                    "--no-playlist",
+                    "--skip-download",
+                    url,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if info_result.returncode == 0:
+                video_title = info_result.stdout.strip()
+                logger.info(f"Got video title: {video_title}")
+        except Exception as e:
+            logger.warning(f"Could not get video title: {e}")
+
         # Download audio using yt-dlp
         try:
             result = subprocess.run(
@@ -124,25 +144,6 @@ def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Option
             logger.error(f"Audio file not found at {audio_path}")
             return None, None, False
         logger.info(f"Audio file exists, size: {os.path.getsize(audio_path)} bytes")
-
-        # Get video title from yt-dlp
-        video_title = None
-        try:
-            title_result = subprocess.run(
-                [
-                    "yt-dlp",
-                    "--print", "%(title)s",
-                    "--no-playlist",
-                    url,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            if title_result.returncode == 0:
-                video_title = title_result.stdout.strip()
-        except Exception:
-            pass
 
         # Transcribe with MLX Whisper
         try:
@@ -200,8 +201,14 @@ def _parse_output(url: str, video_title: str, transcript: str, raw: str) -> dict
         }
 
     # Ensure all expected fields exist
+    # Prefer yt-dlp title over agent title, unless yt-dlp failed
+    agent_title = data.get("video_title", "")
+    final_title = video_title if video_title and video_title.lower() not in ("unknown", "") else agent_title
+    if not final_title or final_title.lower() == "unknown":
+        final_title = "YouTube Video"
+
     result = {
-        "video_title": data.get("video_title", video_title),
+        "video_title": final_title,
         "video_url": url,
         "transcript": transcript,
         "useful_sentences": data.get("useful_sentences", []),
@@ -215,19 +222,18 @@ def _parse_output(url: str, video_title: str, transcript: str, raw: str) -> dict
 
 def _save(data: dict, supabase: Client, profile_id: str) -> None:
     """Save the analysis to the database."""
-    sentences = data.get("useful_sentences", [])
-    phrases = data.get("everyday_phrases", [])
-
     row = {
         "profile_id": profile_id,
         "video_title": data.get("video_title", ""),
         "video_url": data.get("video_url", ""),
-        "sentence_count": len(sentences),
-        "phrase_count": len(phrases),
-        "analysis_data": data,  # Store full JSON for detail view
+        "transcript": data.get("transcript", ""),
+        "useful_sentences": data.get("useful_sentences", []),
+        "grammar_patterns": data.get("grammar_patterns", []),
+        "everyday_phrases": data.get("everyday_phrases", []),
+        "learning_tip": data.get("learning_tip"),
     }
 
-    res = supabase.table("youtube_analyses").insert(row).execute()
+    res = supabase.table("youtube_gem").insert(row).execute()
     if not res.data:
         raise RuntimeError("Failed to insert YouTube analysis")
 
@@ -245,10 +251,11 @@ def list_youtube_analyses(
     offset = page * page_size
     end = offset + page_size - 1
 
+    # Calculate counts from JSONB arrays
     res = (
-        supabase.table("youtube_analyses")
+        supabase.table("youtube_gem")
         .select(
-            "id, created_at, video_title, video_url, sentence_count, phrase_count",
+            "id, created_at, video_title, video_url, useful_sentences, everyday_phrases",
             count="exact",
         )
         .eq("profile_id", profile_id)
@@ -258,8 +265,23 @@ def list_youtube_analyses(
     )
     rows = res.data or []
     total = int(res.count) if res.count is not None else len(rows)
+
+    # Transform rows to match history item schema
+    items = []
+    for row in rows:
+        useful_sentences = row.get("useful_sentences", [])
+        everyday_phrases = row.get("everyday_phrases", [])
+        items.append({
+            "id": row.get("id"),
+            "created_at": row.get("created_at"),
+            "video_title": row.get("video_title", ""),
+            "video_url": row.get("video_url", ""),
+            "sentence_count": len(useful_sentences) if isinstance(useful_sentences, list) else 0,
+            "phrase_count": len(everyday_phrases) if isinstance(everyday_phrases, list) else 0,
+        })
+
     return {
-        "items": rows,
+        "items": items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -273,8 +295,8 @@ def get_youtube_analysis_detail(
 ) -> Optional[dict]:
     """Load one YouTube analysis with full data."""
     res = (
-        supabase.table("youtube_analyses")
-        .select("id, video_title, video_url, analysis_data, created_at")
+        supabase.table("youtube_gem")
+        .select("id, video_title, video_url, transcript, useful_sentences, grammar_patterns, everyday_phrases, learning_tip, created_at")
         .eq("id", analysis_id)
         .eq("profile_id", profile_id)
         .limit(1)
@@ -284,15 +306,15 @@ def get_youtube_analysis_detail(
         return None
 
     row = res.data[0]
-    analysis_data = row.get("analysis_data", {})
 
     return {
         "id": row.get("id"),
         "video_title": row.get("video_title", ""),
         "video_url": row.get("video_url", ""),
-        "useful_sentences": analysis_data.get("useful_sentences", []),
-        "grammar_patterns": analysis_data.get("grammar_patterns", []),
-        "everyday_phrases": analysis_data.get("everyday_phrases", []),
-        "learning_tip": analysis_data.get("learning_tip"),
+        "transcript": row.get("transcript", ""),
+        "useful_sentences": row.get("useful_sentences", []),
+        "grammar_patterns": row.get("grammar_patterns", []),
+        "everyday_phrases": row.get("everyday_phrases", []),
+        "learning_tip": row.get("learning_tip"),
         "created_at": row.get("created_at"),
     }
