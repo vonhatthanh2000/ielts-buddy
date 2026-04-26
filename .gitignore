@@ -5,3 +5,12 @@
 .env.local
 
 .claude/settings.local.json
+
+# Temporary files from MLX transcription
+/tmp/
+tmp/
+tmp*/
+*.tmp
+*.m4a
+*.mp3
+*.wav
