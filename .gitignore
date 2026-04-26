@@ -1,7 +1,22 @@
 .venv/
 
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
 # Secrets and local config (never commit real URLs or keys)
 .env
 .env.local
 
 .claude/settings.local.json
+
+# Temporary files from MLX transcription
+/tmp/
+tmp/
+tmp*/
+*.tmp
+*.m4a
+*.mp3
+*.wav
