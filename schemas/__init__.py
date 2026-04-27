@@ -22,6 +22,11 @@ from schemas.sentence import (
     SentenceHistoryResponse,
     SentenceMistakeItem,
     SentenceRequest,
+    StructuredBatchAnalysis,
+    StructuredBatchAnalysisListItem,
+    StructuredBatchAnalysisListResponse,
+    StructuredBatchAnalysisRequest,
+    StructuredBatchAnalysisResponse,
 )
 from schemas.user import UserResponse
 from schemas.youtube import (
@@ -47,6 +52,11 @@ __all__ = [
     "SentenceHistoryResponse",
     "SentenceMistakeItem",
     "SentenceRequest",
+    "StructuredBatchAnalysis",
+    "StructuredBatchAnalysisListItem",
+    "StructuredBatchAnalysisListResponse",
+    "StructuredBatchAnalysisRequest",
+    "StructuredBatchAnalysisResponse",
     "SwitchProfileRequest",
     "UserResponse",
     "YoutubeAnalysisHistoryResponse",

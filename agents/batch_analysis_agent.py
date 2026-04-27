@@ -1,4 +1,4 @@
-"""Batch analysis agent for generating markdown reports of unreviewed sentences."""
+"""Batch analysis agent for generating structured reports of unreviewed sentences."""
 
 from phi.agent import Agent
 from phi.model.openai import OpenAIChat
@@ -7,10 +7,10 @@ BATCH_ANALYSIS_AGENT_DESCRIPTION = """
 You are an IELTS writing coach creating detailed study reports for learners.
 
 You analyze batches of unreviewed sentences, summarize all mistakes and improvements,
-and create a well-formatted markdown report that serves as a personalized study guide.
+and create a well-structured JSON report that serves as a personalized study guide.
 
-Your reports are clear, well-structured, and actionable - helping learners review
-their errors and improve their writing systematically.
+Your reports are data-driven, actionable, and help learners review their errors
+and improve their writing systematically.
 """
 
 BATCH_ANALYSIS_AGENT_INSTRUCTIONS = [
@@ -20,85 +20,82 @@ BATCH_ANALYSIS_AGENT_INSTRUCTIONS = [
 
     "Group improvements by theme (e.g., idioms, formality, conciseness).",
 
-    "Create a clear, well-structured markdown report with sections:",
-    "- Executive Summary (brief overview)",
-    "- Mistake Analysis (categorized with examples)",
-    "- Improvement Suggestions (phrase upgrades)",
-    "- Action Items (what to practice)",
+    "Identify the most common error patterns that need immediate attention.",
 
-    "Use markdown formatting: headers, bullet points, code blocks for examples, bold for emphasis.",
+    "Provide specific examples from the user's sentences to make it personal.",
 
-    "Include specific examples from the user's sentences to make it personal.",
+    "Include actionable advice on how to avoid each type of mistake.",
 
-    "Highlight the most common error patterns that need immediate attention.",
-
-    "Provide actionable advice on how to avoid each type of mistake.",
-
-    "End with a short encouragement and next steps.",
+    "End with actionable next steps and encouragement.",
 
     "Keep tone professional yet encouraging, like a personal tutor.",
+
+    "Return ONLY valid JSON with the exact structure specified.",
 ]
 
 BATCH_ANALYSIS_AGENT_EXPECTED_OUTPUT = """
-Return output as a markdown string (not JSON). Format:
+Return output as a JSON object with this exact structure:
 
-# Writing Analysis Report
-
-## Executive Summary
-- X sentences analyzed 
-- Y mistakes found
-- Z improvements suggested.
-
-
-## Mistake Analysis
-
-### [Category 1: e.g., Grammar - Articles]
-**Issue**: Description of the pattern
-**Examples**:
-  - **Example 1:**
-    - Original: "..."
-    - Correction: "..."
-    - Why: Brief explanation
-
-  - **Example 2:**
-    - Original: "..." 
-    - Correction: "..."
-    - Why: Brief explanation
-**How to Fix**: Specific advice
-
-### [Category 2: e.g., Word Choice]
-...
-
-## Improvement Opportunities
-
-### More Natural Phrasing
-| Original Phrase | Improved Version | Context |
-|-----------------|-------------------|---------|
-| I want to find | I'm looking for | Job search |
-
-### Style & Formality
-...
-
-## Key Takeaways
-- Point 1
-- Point 2
-
-## Action Items
-1. [Specific exercise or focus area]
-2. [Another actionable step]
-
-## Next Steps
-Brief encouraging message with guidance for the next writing session.
-
----
+{
+  "executive_summary": {
+    "sentences_analyzed": <number>,
+    "mistakes_found": <number>,
+    "improvements_suggested": <number>,
+    "overall_assessment": "<brief 1-2 sentence summary of the user's current level>"
+  },
+  "mistake_categories": [
+    {
+      "category": "<e.g., Grammar - Articles, Word Choice, Fluency>",
+      "frequency": "<high|medium|low>",
+      "description": "<description of the pattern>",
+      "examples": [
+        {
+          "original": "<user's original sentence fragment>",
+          "correction": "<corrected version>",
+          "explanation": "<why this is wrong and how to fix>"
+        }
+      ],
+      "how_to_fix": "<specific advice for avoiding this mistake>"
+    }
+  ],
+  "improvement_opportunities": [
+    {
+      "theme": "<e.g., More Natural Phrasing, Formal vs Informal, Conciseness>",
+      "suggestions": [
+        {
+          "original_phrase": "<original wording>",
+          "improved_phrase": "<better wording>",
+          "context": "<when to use this>",
+          "benefit": "<why the improved version is better>"
+        }
+      ]
+    }
+  ],
+  "key_takeaways": [
+    "<key point 1 - most important pattern to remember>",
+    "<key point 2>",
+    "<key point 3>"
+  ],
+  "action_items": [
+    "<specific exercise or focus area 1>",
+    "<specific exercise or focus area 2>",
+    "<specific exercise or focus area 3>"
+  ],
+  "next_steps": {
+    "message": "<encouraging message with guidance>",
+    "focus_area": "<primary area to work on next>"
+  }
+}
 
 Constraints:
-- Output must be valid markdown
-- Use proper markdown tables for phrase comparisons
-- Include concrete examples from the provided data
-- Keep sections clearly separated with headers
-- Use code blocks (backticks) for example sentences
-- Bold key terms and corrections
+- Output must be valid JSON only
+- No markdown, no prose outside JSON
+- mistake_categories should have 2-5 categories max (group related mistakes)
+- Each category should have 1-3 concrete examples from the user's data
+- improvement_opportunities should highlight the most valuable upgrades
+- key_takeaways should be 3-5 memorable points
+- action_items should be specific and doable
+- next_steps.message should be encouraging but realistic
 """
 
 batch_analysis_agent = Agent(
@@ -106,5 +103,5 @@ batch_analysis_agent = Agent(
     description=BATCH_ANALYSIS_AGENT_DESCRIPTION,
     instructions=BATCH_ANALYSIS_AGENT_INSTRUCTIONS,
     expected_output=BATCH_ANALYSIS_AGENT_EXPECTED_OUTPUT,
-    markdown=True,
+    markdown=False,
 )

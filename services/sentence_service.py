@@ -205,11 +205,11 @@ def generate_batch_analysis(
     max_sentences: int = 20,
 ) -> dict:
     """
-    Generate a markdown analysis report of unanalyzed sentences.
+    Generate a structured analysis report of unanalyzed sentences.
 
     Fetches unanalyzed sentences with their mistakes and improvements,
-    calls the batch analysis agent to generate a report, saves it,
-    and marks the sentences as analyzed.
+    calls the batch analysis agent to generate a structured JSON report,
+    saves it, and marks the sentences as analyzed.
 
     Returns the saved analysis payload.
     """
@@ -219,14 +219,14 @@ def generate_batch_analysis(
     if not sentences:
         raise ValueError("No unanalyzed sentences found")
 
-    # Run batch analysis
-    markdown_content = _run_batch_analysis(sentences)
+    # Run batch analysis (now returns structured JSON)
+    analysis_json = _run_batch_analysis(sentences)
 
     # Get sentence IDs for marking as analyzed
     sentence_ids = [s["id"] for s in sentences]
 
-    # Save analysis (just store the markdown content)
-    analysis = _save_analysis(supabase, profile_id, markdown_content)
+    # Save structured analysis
+    analysis = _save_analysis(supabase, profile_id, analysis_json)
 
     # Mark sentences as analyzed
     _mark_sentences_analyzed(supabase, sentence_ids)
@@ -300,11 +300,37 @@ def _fetch_unanalyzed_sentences(
     return result
 
 
-def _run_batch_analysis(sentences: list[dict]) -> str:
-    """Call the batch analysis agent with the sentences."""
+def _run_batch_analysis(sentences: list[dict]) -> dict:
+    """Call the batch analysis agent with the sentences and parse JSON."""
+    import json
+
     prompt = _build_batch_analysis_prompt(sentences)
     response = batch_analysis_agent.run(prompt)
-    return response.content if hasattr(response, "content") else str(response)
+    raw = response.content if hasattr(response, "content") else str(response)
+
+    # Parse JSON response
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        # Return a safe fallback structure if parsing fails
+        return {
+            "executive_summary": {
+                "sentences_analyzed": len(sentences),
+                "mistakes_found": 0,
+                "improvements_suggested": 0,
+                "overall_assessment": "Could not parse analysis. Please try again."
+            },
+            "mistake_categories": [],
+            "improvement_opportunities": [],
+            "key_takeaways": [],
+            "action_items": [],
+            "next_steps": {
+                "message": "Analysis could not be generated. Please try again.",
+                "focus_area": "General writing practice"
+            }
+        }
+
+    return data
 
 
 def _build_batch_analysis_prompt(sentences: list[dict]) -> str:
@@ -351,11 +377,11 @@ def _build_batch_analysis_prompt(sentences: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _save_analysis(supabase: Client, profile_id: str, content: str) -> dict:
-    """Save the analysis report to the database."""
+def _save_analysis(supabase: Client, profile_id: str, analysis_data: dict) -> dict:
+    """Save the structured analysis report to the database."""
     row = {
         "profile_id": profile_id,
-        "content": content,
+        "analysis_data": analysis_data,  # Store as JSONB
     }
 
     res = supabase.table("sentence_analyses").insert(row).execute()
@@ -369,7 +395,7 @@ def _save_analysis(supabase: Client, profile_id: str, content: str) -> dict:
 
     detail = (
         supabase.table("sentence_analyses")
-        .select("id, content, created_at")
+        .select("id, analysis_data, created_at")
         .eq("id", analysis_id)
         .eq("profile_id", profile_id)
         .limit(1)
@@ -378,7 +404,12 @@ def _save_analysis(supabase: Client, profile_id: str, content: str) -> dict:
     if not detail.data:
         raise RuntimeError("Saved analysis could not be loaded")
 
-    return detail.data[0]
+    row_data = detail.data[0]
+    return {
+        "id": row_data.get("id"),
+        "analysis": row_data.get("analysis_data", {}),
+        "created_at": row_data.get("created_at"),
+    }
 
 
 def _mark_sentences_analyzed(supabase: Client, sentence_ids: list[str]) -> None:
@@ -408,7 +439,7 @@ def list_profile_sentence_analyses(
 
     res = (
         supabase.table("sentence_analyses")
-        .select("id, content, created_at", count="exact")
+        .select("id, analysis_data, created_at", count="exact")
         .eq("profile_id", profile_id)
         .order("created_at", desc=True)
         .range(offset, end)
@@ -416,8 +447,24 @@ def list_profile_sentence_analyses(
     )
     rows = res.data or []
     total = int(res.count) if res.count is not None else len(rows)
+
+    # Transform rows to match the list item format
+    # Frontend parses summary stats from analysis_data
+    items = []
+    for row in rows:
+        analysis_data = row.get("analysis_data", {})
+        exec_summary = analysis_data.get("executive_summary", {})
+        items.append({
+            "id": row.get("id"),
+            "created_at": row.get("created_at"),
+            "sentences_analyzed": exec_summary.get("sentences_analyzed", 0),
+            "mistakes_found": exec_summary.get("mistakes_found", 0),
+            "improvements_suggested": exec_summary.get("improvements_suggested", 0),
+            "overall_assessment": exec_summary.get("overall_assessment", ""),
+        })
+
     return {
-        "items": rows,
+        "items": items,
         "total": total,
         "page": page,
         "page_size": page_size,
@@ -432,7 +479,7 @@ def get_profile_sentence_analysis_detail(
     """Load one sentence batch analysis for a profile."""
     res = (
         supabase.table("sentence_analyses")
-        .select("id, content, created_at")
+        .select("id, analysis_data, created_at")
         .eq("id", analysis_id)
         .eq("profile_id", profile_id)
         .limit(1)
@@ -440,4 +487,10 @@ def get_profile_sentence_analysis_detail(
     )
     if not res.data:
         return None
-    return res.data[0]
+
+    row = res.data[0]
+    return {
+        "id": row.get("id"),
+        "analysis": row.get("analysis_data", {}),
+        "created_at": row.get("created_at"),
+    }

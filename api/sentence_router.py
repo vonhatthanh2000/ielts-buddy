@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps import get_current_profile_id
 from schemas import (
-    BatchAnalysisListResponse,
-    BatchAnalysisRequest,
-    BatchAnalysisResponse,
     SentenceCorrectResponse,
     SentenceHistoryResponse,
     SentenceRequest,
+    StructuredBatchAnalysisListResponse,
+    StructuredBatchAnalysisRequest,
+    StructuredBatchAnalysisResponse,
 )
 from supabase.client import Client, get_supabase
 from services.sentence_service import (
@@ -48,20 +48,20 @@ def sentence_correct(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.post("/analyze", response_model=BatchAnalysisResponse)
+@router.post("/analyze", response_model=StructuredBatchAnalysisResponse)
 def analyze_batch(
-    body: BatchAnalysisRequest,
+    body: StructuredBatchAnalysisRequest,
     supabase: Client = Depends(get_supabase),
     profile_id: str = Depends(get_current_profile_id),
-) -> BatchAnalysisResponse:
+) -> StructuredBatchAnalysisResponse:
     """
-    Generate a markdown analysis report of unreviewed sentences.
+    Generate a structured analysis report of unreviewed sentences.
 
     Finds sentences where `analyzed=false`, gathers all their mistakes
-    and improvements, generates a comprehensive markdown report via AI,
+    and improvements, generates a comprehensive structured JSON report via AI,
     stores it in `sentence_analyses`, and marks the sentences as analyzed.
 
-    Returns the saved analysis report payload.
+    Returns the saved structured analysis report payload.
     """
     try:
         raw = generate_batch_analysis(
@@ -69,39 +69,39 @@ def analyze_batch(
             profile_id,
             max_sentences=body.max_sentences,
         )
-        return BatchAnalysisResponse.model_validate(raw)
+        return StructuredBatchAnalysisResponse.model_validate(raw)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.get("/analyses", response_model=BatchAnalysisListResponse)
+@router.get("/analyses", response_model=StructuredBatchAnalysisListResponse)
 def list_batch_analyses(
     supabase: Client = Depends(get_supabase),
     profile_id: str = Depends(get_current_profile_id),
     page: int = Query(0, ge=0, description="First page is 0."),
     page_size: int = Query(20, ge=1, le=100),
-) -> BatchAnalysisListResponse:
+) -> StructuredBatchAnalysisListResponse:
     raw = list_profile_sentence_analyses(
         supabase,
         profile_id,
         page=page,
         page_size=page_size,
     )
-    return BatchAnalysisListResponse.model_validate(raw)
+    return StructuredBatchAnalysisListResponse.model_validate(raw)
 
 
-@router.get("/analyses/{analysis_id}", response_model=BatchAnalysisResponse)
+@router.get("/analyses/{analysis_id}", response_model=StructuredBatchAnalysisResponse)
 def batch_analysis_detail(
     analysis_id: UUID,
     supabase: Client = Depends(get_supabase),
     profile_id: str = Depends(get_current_profile_id),
-) -> BatchAnalysisResponse:
+) -> StructuredBatchAnalysisResponse:
     raw = get_profile_sentence_analysis_detail(supabase, profile_id, str(analysis_id))
     if raw is None:
         raise HTTPException(status_code=404, detail="Analysis not found")
-    return BatchAnalysisResponse.model_validate(raw)
+    return StructuredBatchAnalysisResponse.model_validate(raw)
 
 
 @router.get("/{sentence_id}", response_model=SentenceCorrectResponse)
