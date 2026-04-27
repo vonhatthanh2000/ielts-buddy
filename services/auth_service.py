@@ -34,7 +34,7 @@ def verify_password(plain: str, password_hash: str) -> bool:
         return False
 
 
-def create_session_token(user_id: str, username: str) -> tuple[str, int]:
+def create_session_token(user_id: str, username: str, profile_id: Optional[str] = None) -> tuple[str, int]:
     """Return (jwt, expires_in_seconds)."""
     now = datetime.now(timezone.utc)
     exp = now + timedelta(days=SESSION_DAYS)
@@ -44,6 +44,8 @@ def create_session_token(user_id: str, username: str) -> tuple[str, int]:
         "iat": now,
         "exp": exp,
     }
+    if profile_id:
+        payload["profile_id"] = profile_id
     token = jwt.encode(payload, _secret(), algorithm="HS256")
     expires_in = int((exp - now).total_seconds())
     return token, expires_in

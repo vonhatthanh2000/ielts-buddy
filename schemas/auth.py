@@ -15,6 +15,13 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=500)
 
 
+class SwitchProfileRequest(BaseModel):
+    profile_id: str = Field(
+        ...,
+        description="Profile ID to switch to and embed in the token.",
+    )
+
+
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=200)
     email: EmailStr = Field(..., max_length=320)

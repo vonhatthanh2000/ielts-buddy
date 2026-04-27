@@ -5,7 +5,7 @@ Import from here: ``from schemas import SentenceCorrectResponse`` or use
 submodules ``schemas.sentence``, ``schemas.user``.
 """
 
-from schemas.auth import LoginRequest, LoginResponse, RegisterRequest
+from schemas.auth import LoginRequest, LoginResponse, RegisterRequest, SwitchProfileRequest
 from schemas.profile import (
     ProfileCreate,
     ProfileListResponse,
@@ -47,6 +47,7 @@ __all__ = [
     "SentenceHistoryResponse",
     "SentenceMistakeItem",
     "SentenceRequest",
+    "SwitchProfileRequest",
     "UserResponse",
     "YoutubeAnalysisHistoryResponse",
     "YoutubeAnalysisRequest",
