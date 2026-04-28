@@ -29,6 +29,15 @@ from schemas.sentence import (
     StructuredBatchAnalysisResponse,
 )
 from schemas.user import UserResponse
+from schemas.speech import (
+    ImprovementItem as SpeechImprovementItem,
+    SpeechEvaluationData,
+    SpeechEvaluationResponse,
+    SpeechHistoryItem,
+    SpeechHistoryResponse,
+    SpeechUploadRequest,
+    StrengthItem,
+)
 from schemas.youtube import (
     YoutubeAnalysisHistoryResponse,
     YoutubeAnalysisRequest,
@@ -57,6 +66,13 @@ __all__ = [
     "StructuredBatchAnalysisListResponse",
     "StructuredBatchAnalysisRequest",
     "StructuredBatchAnalysisResponse",
+    "SpeechEvaluationData",
+    "SpeechEvaluationResponse",
+    "SpeechHistoryItem",
+    "SpeechHistoryResponse",
+    "SpeechImprovementItem",
+    "SpeechUploadRequest",
+    "StrengthItem",
     "SwitchProfileRequest",
     "UserResponse",
     "YoutubeAnalysisHistoryResponse",
