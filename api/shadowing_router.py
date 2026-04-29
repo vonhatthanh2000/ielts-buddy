@@ -20,6 +20,7 @@ from schemas import (
     ShadowingStatsResponse,
 )
 from services.shadowing_service import (
+    get_all_shadowing_for_video,
     get_shadowing_attempt_detail,
     get_shadowing_stats,
     list_shadowing_attempts,

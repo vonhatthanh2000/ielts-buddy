@@ -332,6 +332,50 @@ def get_shadowing_attempt_detail(
     }
 
 
+def get_all_shadowing_for_video(
+    supabase: Client,
+    profile_id: str,
+    youtube_gem_id: str,
+) -> dict:
+    """Get all shadowing attempts for a specific YouTube video, ordered by sentence index."""
+    res = (
+        supabase.table("shadowing_attempts")
+        .select(
+            "id, created_at, youtube_gem_id, target_sentence, target_sentence_index, "
+            "audio_url, audio_duration_seconds, similarity_score",
+            count="exact",
+        )
+        .eq("profile_id", profile_id)
+        .eq("youtube_gem_id", youtube_gem_id)
+        .order("target_sentence_index", desc=False)
+        .execute()
+    )
+
+    rows = res.data or []
+    total = int(res.count) if res.count is not None else len(rows)
+
+    # Transform rows to match history item schema
+    items = []
+    for row in rows:
+        items.append({
+            "id": row.get("id"),
+            "created_at": row.get("created_at"),
+            "youtube_gem_id": row.get("youtube_gem_id"),
+            "target_sentence": row.get("target_sentence"),
+            "target_sentence_index": row.get("target_sentence_index"),
+            "audio_url": row.get("audio_url"),
+            "audio_duration_seconds": row.get("audio_duration_seconds"),
+            "similarity_score": row.get("similarity_score"),
+        })
+
+    return {
+        "items": items,
+        "total": total,
+        "page": 0,
+        "page_size": total,
+    }
+
+
 def get_shadowing_stats(
     supabase: Client,
     profile_id: str,
