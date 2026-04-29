@@ -1,7 +1,6 @@
 import os
 import tempfile
 from typing import Optional
-from uuid import UUID
 
 from fastapi import (
     APIRouter,
@@ -145,12 +144,17 @@ def shadowing_history(
 
 @router.get("/{attempt_id}", response_model=ShadowingAttemptResponse)
 def shadowing_attempt_detail(
-    attempt_id: UUID,
+    attempt_id: str,  # Composite key: profile_id:youtube_gem_id:target_sentence_index
     supabase: Client = Depends(get_supabase),
     profile_id: str = Depends(get_current_profile_id),
 ) -> ShadowingAttemptResponse:
-    """Get detailed evaluation for a specific shadowing attempt."""
-    raw = get_shadowing_attempt_detail(supabase, profile_id, str(attempt_id))
+    """
+    Get detailed evaluation for a specific shadowing attempt.
+    
+    The attempt_id is a composite key in format: profile_id:youtube_gem_id:target_sentence_index
+    Example: d305dffd-ee90-4cf5-98ea-754baa66ad7e:abc123:5
+    """
+    raw = get_shadowing_attempt_detail(supabase, profile_id, attempt_id)
     if raw is None:
         raise HTTPException(status_code=404, detail="Shadowing attempt not found")
     return ShadowingAttemptResponse.model_validate(raw)

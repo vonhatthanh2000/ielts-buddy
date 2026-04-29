@@ -56,11 +56,12 @@ class ShadowingAttemptResponse(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    id: str = Field(..., description="Unique ID of the shadowing attempt.")
+    id: str = Field(..., description="Composite ID: profile_id:youtube_gem_id:target_sentence_index")
     created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     youtube_gem_id: str = Field(..., description="ID of the YouTube video being shadowed.")
     target_sentence: str = Field(..., description="The target sentence practiced.")
-    target_sentence_index: Optional[int] = None
+    target_sentence_index: int = Field(..., description="Index of the sentence in the transcript.")
     audio_url: str = Field(..., description="URL to the stored audio file.")
     audio_duration_seconds: Optional[int] = None
     user_transcript: str = Field(..., description="Transcribed text from user's speech.")
@@ -72,11 +73,11 @@ class ShadowingHistoryItem(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    id: str
+    id: str = Field(..., description="Composite ID: profile_id:youtube_gem_id:target_sentence_index")
     created_at: Optional[str] = None
     youtube_gem_id: str
     target_sentence: str = Field(..., description="The target sentence practiced.")
-    target_sentence_index: Optional[int] = None
+    target_sentence_index: int = Field(..., description="Index of the sentence in the transcript.")
     audio_url: str
     audio_duration_seconds: Optional[int] = None
     similarity_score: Optional[int] = None

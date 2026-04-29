@@ -199,12 +199,15 @@ def _save_shadowing_attempt(
     youtube_gem_id: str,
     duration_seconds: Optional[int] = None,
 ) -> dict:
-    """Save the shadowing attempt and evaluation to the database."""
+    """Save or update the shadowing attempt using composite primary key."""
+    if target_sentence_index is None:
+        target_sentence_index = 0  # Default if not provided
+
     row = {
         "profile_id": profile_id,
         "youtube_gem_id": youtube_gem_id,
-        "target_sentence": target_sentence,
         "target_sentence_index": target_sentence_index,
+        "target_sentence": target_sentence,
         "audio_url": audio_url,
         "audio_duration_seconds": duration_seconds,
         "user_transcript": user_transcript,
@@ -213,16 +216,21 @@ def _save_shadowing_attempt(
         "feedback": evaluation["feedback"],
     }
 
-    res = supabase.table("shadowing_attempts").insert(row).execute()
+    # Use upsert to handle composite primary key (insert or update)
+    res = supabase.table("shadowing_attempts").upsert(row).execute()
     if not res.data:
-        raise RuntimeError("Failed to insert shadowing attempt")
+        raise RuntimeError("Failed to save shadowing attempt")
 
     saved = res.data[0]
 
     # Return in schema-compatible format
+    # Use composite key as identifier: profile_id:youtube_gem_id:target_sentence_index
+    composite_id = f"{profile_id}:{youtube_gem_id}:{target_sentence_index}"
+
     return {
-        "id": saved["id"],
+        "id": composite_id,
         "created_at": saved["created_at"],
+        "updated_at": saved.get("updated_at"),
         "youtube_gem_id": saved["youtube_gem_id"],
         "target_sentence": saved["target_sentence"],
         "target_sentence_index": saved["target_sentence_index"],
@@ -254,7 +262,7 @@ def list_shadowing_attempts(
     query = (
         supabase.table("shadowing_attempts")
         .select(
-            "id, created_at, youtube_gem_id, target_sentence, target_sentence_index, "
+            "created_at, youtube_gem_id, target_sentence, target_sentence_index, "
             "audio_url, audio_duration_seconds, similarity_score",
             count="exact",
         )
@@ -272,12 +280,15 @@ def list_shadowing_attempts(
     # Transform rows to match history item schema
     items = []
     for row in rows:
+        yid = row.get("youtube_gem_id")
+        idx = row.get("target_sentence_index")
+        composite_id = f"{profile_id}:{yid}:{idx}"
         items.append({
-            "id": row.get("id"),
+            "id": composite_id,
             "created_at": row.get("created_at"),
-            "youtube_gem_id": row.get("youtube_gem_id"),
+            "youtube_gem_id": yid,
             "target_sentence": row.get("target_sentence"),
-            "target_sentence_index": row.get("target_sentence_index"),
+            "target_sentence_index": idx,
             "audio_url": row.get("audio_url"),
             "audio_duration_seconds": row.get("audio_duration_seconds"),
             "similarity_score": row.get("similarity_score"),
@@ -296,16 +307,31 @@ def get_shadowing_attempt_detail(
     profile_id: str,
     attempt_id: str,
 ) -> Optional[dict]:
-    """Load one shadowing attempt with full evaluation data."""
+    """
+    Load one shadowing attempt with full evaluation data.
+    
+    The attempt_id format is: profile_id:youtube_gem_id:target_sentence_index
+    or can query by youtube_gem_id and target_sentence_index separately.
+    """
+    # Parse composite id if provided
+    parts = attempt_id.split(":")
+    if len(parts) == 3:
+        _, youtube_gem_id, target_sentence_index = parts
+        target_sentence_index = int(target_sentence_index)
+    else:
+        # Fallback: treat as youtube_gem_id and require separate index lookup
+        return None
+
     res = (
         supabase.table("shadowing_attempts")
         .select(
-            "id, created_at, youtube_gem_id, target_sentence, target_sentence_index, "
+            "created_at, updated_at, youtube_gem_id, target_sentence, target_sentence_index, "
             "audio_url, audio_duration_seconds, user_transcript, "
             "similarity_score, word_differences, feedback"
         )
-        .eq("id", attempt_id)
         .eq("profile_id", profile_id)
+        .eq("youtube_gem_id", youtube_gem_id)
+        .eq("target_sentence_index", target_sentence_index)
         .limit(1)
         .execute()
     )
@@ -314,13 +340,17 @@ def get_shadowing_attempt_detail(
         return None
 
     row = res.data[0]
+    yid = row.get("youtube_gem_id")
+    idx = row.get("target_sentence_index")
+    composite_id = f"{profile_id}:{yid}:{idx}"
 
     return {
-        "id": row.get("id"),
+        "id": composite_id,
         "created_at": row.get("created_at"),
-        "youtube_gem_id": row.get("youtube_gem_id"),
+        "updated_at": row.get("updated_at"),
+        "youtube_gem_id": yid,
         "target_sentence": row.get("target_sentence"),
-        "target_sentence_index": row.get("target_sentence_index"),
+        "target_sentence_index": idx,
         "audio_url": row.get("audio_url"),
         "audio_duration_seconds": row.get("audio_duration_seconds"),
         "user_transcript": row.get("user_transcript"),
@@ -341,7 +371,7 @@ def get_all_shadowing_for_video(
     res = (
         supabase.table("shadowing_attempts")
         .select(
-            "id, created_at, youtube_gem_id, target_sentence, target_sentence_index, "
+            "created_at, youtube_gem_id, target_sentence, target_sentence_index, "
             "audio_url, audio_duration_seconds, similarity_score",
             count="exact",
         )
@@ -357,12 +387,15 @@ def get_all_shadowing_for_video(
     # Transform rows to match history item schema
     items = []
     for row in rows:
+        yid = row.get("youtube_gem_id")
+        idx = row.get("target_sentence_index")
+        composite_id = f"{profile_id}:{yid}:{idx}"
         items.append({
-            "id": row.get("id"),
+            "id": composite_id,
             "created_at": row.get("created_at"),
-            "youtube_gem_id": row.get("youtube_gem_id"),
+            "youtube_gem_id": yid,
             "target_sentence": row.get("target_sentence"),
-            "target_sentence_index": row.get("target_sentence_index"),
+            "target_sentence_index": idx,
             "audio_url": row.get("audio_url"),
             "audio_duration_seconds": row.get("audio_duration_seconds"),
             "similarity_score": row.get("similarity_score"),
@@ -386,7 +419,7 @@ def get_shadowing_stats(
     res = (
         supabase.table("shadowing_attempts")
         .select(
-            "id, target_sentence_index, similarity_score"
+            "target_sentence_index, similarity_score"
         )
         .eq("profile_id", profile_id)
         .eq("youtube_gem_id", youtube_gem_id)
@@ -416,9 +449,11 @@ def get_shadowing_stats(
     scores = [row.get("similarity_score") for row in rows if row.get("similarity_score") is not None]
     average_score = sum(scores) / len(scores) if scores else None
     
+    # Find best attempt and build composite id
     best_attempt = max(rows, key=lambda x: x.get("similarity_score") or 0, default=None)
     best_score = best_attempt.get("similarity_score") if best_attempt else None
-    best_id = best_attempt.get("id") if best_attempt else None
+    best_idx = best_attempt.get("target_sentence_index") if best_attempt else None
+    best_id = f"{profile_id}:{youtube_gem_id}:{best_idx}" if best_idx is not None else None
 
     # Progress by sentence
     sentence_progress = {}
