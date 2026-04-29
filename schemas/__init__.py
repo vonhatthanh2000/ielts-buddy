@@ -29,6 +29,24 @@ from schemas.sentence import (
     StructuredBatchAnalysisResponse,
 )
 from schemas.user import UserResponse
+from schemas.speech import (
+    ImprovementItem as SpeechImprovementItem,
+    SpeechEvaluationData,
+    SpeechEvaluationResponse,
+    SpeechHistoryItem,
+    SpeechHistoryResponse,
+    SpeechUploadRequest,
+    StrengthItem,
+)
+from schemas.shadowing import (
+    ShadowingAttemptRequest,
+    ShadowingAttemptResponse,
+    ShadowingEvaluationData,
+    ShadowingHistoryItem,
+    ShadowingHistoryResponse,
+    ShadowingStatsResponse,
+    WordDifference,
+)
 from schemas.youtube import (
     YoutubeAnalysisHistoryResponse,
     YoutubeAnalysisRequest,
@@ -57,8 +75,22 @@ __all__ = [
     "StructuredBatchAnalysisListResponse",
     "StructuredBatchAnalysisRequest",
     "StructuredBatchAnalysisResponse",
+    "ShadowingAttemptRequest",
+    "ShadowingAttemptResponse",
+    "ShadowingEvaluationData",
+    "ShadowingHistoryItem",
+    "ShadowingHistoryResponse",
+    "ShadowingStatsResponse",
+    "SpeechEvaluationData",
+    "SpeechEvaluationResponse",
+    "SpeechHistoryItem",
+    "SpeechHistoryResponse",
+    "SpeechImprovementItem",
+    "SpeechUploadRequest",
+    "StrengthItem",
     "SwitchProfileRequest",
     "UserResponse",
+    "WordDifference",
     "YoutubeAnalysisHistoryResponse",
     "YoutubeAnalysisRequest",
     "YoutubeAnalysisResponse",
