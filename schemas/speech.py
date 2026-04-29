@@ -47,10 +47,6 @@ class SpeechUploadRequest(BaseModel):
     not as a base64 string in JSON. This model is for additional metadata.
     """
 
-    youtube_gem_id: Optional[str] = Field(
-        None,
-        description="Optional: ID of a YouTube video this speech is practicing with.",
-    )
     duration_seconds: Optional[int] = Field(
         None,
         ge=1,
@@ -70,7 +66,6 @@ class SpeechEvaluationResponse(BaseModel):
     audio_duration_seconds: Optional[int] = None
     transcript: str = Field(..., description="Transcribed text from the audio.")
     evaluation: SpeechEvaluationData = Field(..., description="AI evaluation results.")
-    youtube_gem_id: Optional[str] = Field(None, description="Linked YouTube analysis if applicable.")
 
 
 class SpeechHistoryItem(BaseModel):

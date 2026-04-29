@@ -15,7 +15,6 @@ def process_speech_recording(
     audio_file_path: str,
     supabase: Client,
     profile_id: str,
-    youtube_gem_id: Optional[str] = None,
     duration_seconds: Optional[int] = None,
 ) -> dict:
     """
@@ -25,7 +24,6 @@ def process_speech_recording(
         audio_file_path: Path to the uploaded audio file
         supabase: Supabase client for database operations
         profile_id: ID of the user's profile
-        youtube_gem_id: Optional linked YouTube analysis ID
         duration_seconds: Optional duration of the recording
 
     Returns:
@@ -50,7 +48,6 @@ def process_speech_recording(
         evaluation=evaluation_data,
         supabase=supabase,
         profile_id=profile_id,
-        youtube_gem_id=youtube_gem_id,
         duration_seconds=duration_seconds,
     )
 
@@ -200,7 +197,6 @@ def _save_recording(
     evaluation: dict,
     supabase: Client,
     profile_id: str,
-    youtube_gem_id: Optional[str] = None,
     duration_seconds: Optional[int] = None,
 ) -> dict:
     """Save the speech recording and evaluation to the database."""
@@ -218,7 +214,6 @@ def _save_recording(
         "improvements": evaluation["improvements"],
         "detailed_feedback": evaluation["detailed_feedback"],
         "learning_tip": evaluation["learning_tip"],
-        "youtube_gem_id": youtube_gem_id,
     }
 
     res = supabase.table("speech_recordings").insert(row).execute()
@@ -234,7 +229,6 @@ def _save_recording(
         "audio_url": saved["audio_url"],
         "audio_duration_seconds": saved["audio_duration_seconds"],
         "transcript": saved["transcript"],
-        "youtube_gem_id": saved["youtube_gem_id"],
         "evaluation": {
             "overall_score": saved["overall_score"],
             "pronunciation_score": saved["pronunciation_score"],
@@ -309,7 +303,7 @@ def get_speech_recording_detail(
         .select(
             "id, created_at, audio_url, audio_duration_seconds, transcript, "
             "overall_score, pronunciation_score, fluency_score, grammar_score, vocabulary_score, "
-            "strengths, improvements, detailed_feedback, learning_tip, youtube_gem_id"
+            "strengths, improvements, detailed_feedback, learning_tip"
         )
         .eq("id", recording_id)
         .eq("profile_id", profile_id)
@@ -328,7 +322,6 @@ def get_speech_recording_detail(
         "audio_url": row.get("audio_url"),
         "audio_duration_seconds": row.get("audio_duration_seconds"),
         "transcript": row.get("transcript"),
-        "youtube_gem_id": row.get("youtube_gem_id"),
         "evaluation": {
             "overall_score": row.get("overall_score"),
             "pronunciation_score": row.get("pronunciation_score"),

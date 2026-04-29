@@ -48,10 +48,6 @@ async def speech_evaluate(
         ...,
         description="Audio file of the speech recording. Supported formats: mp3, m4a, wav, webm, ogg, flac. Max 50MB."
     ),
-    youtube_gem_id: Optional[str] = Form(
-        None,
-        description="Optional: ID of a YouTube video this speech is practicing with."
-    ),
     duration_seconds: Optional[int] = Form(
         None,
         description="Duration of the recording in seconds (max 10 minutes)."
@@ -98,7 +94,6 @@ async def speech_evaluate(
             audio_file_path=tmp_path,
             supabase=supabase,
             profile_id=profile_id,
-            youtube_gem_id=youtube_gem_id,
             duration_seconds=duration_seconds,
         )
         return SpeechEvaluationResponse.model_validate(raw)

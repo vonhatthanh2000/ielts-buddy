@@ -27,15 +27,11 @@ CREATE TABLE IF NOT EXISTS public.speech_recordings (
     strengths jsonb DEFAULT '[]'::jsonb,
     improvements jsonb DEFAULT '[]'::jsonb,
     detailed_feedback text,
-    learning_tip text,
-
-    -- Optional reference (if practicing with a specific YouTube video)
-    youtube_gem_id uuid REFERENCES public.youtube_gem (id) ON DELETE SET NULL
+    learning_tip text
 );
 
 CREATE INDEX IF NOT EXISTS idx_speech_recordings_profile_id ON public.speech_recordings (profile_id);
 CREATE INDEX IF NOT EXISTS idx_speech_recordings_created_at ON public.speech_recordings (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_speech_recordings_youtube_gem ON public.speech_recordings (youtube_gem_id);
 
 COMMENT ON TABLE public.speech_recordings IS 'User audio recordings for IELTS speaking practice with AI evaluation.';
 COMMENT ON COLUMN public.speech_recordings.audio_url IS 'URL to the stored audio file (e.g., Supabase Storage).';

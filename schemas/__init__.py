@@ -38,6 +38,15 @@ from schemas.speech import (
     SpeechUploadRequest,
     StrengthItem,
 )
+from schemas.shadowing import (
+    ShadowingAttemptRequest,
+    ShadowingAttemptResponse,
+    ShadowingEvaluationData,
+    ShadowingHistoryItem,
+    ShadowingHistoryResponse,
+    ShadowingStatsResponse,
+    WordDifference,
+)
 from schemas.youtube import (
     YoutubeAnalysisHistoryResponse,
     YoutubeAnalysisRequest,
@@ -66,6 +75,12 @@ __all__ = [
     "StructuredBatchAnalysisListResponse",
     "StructuredBatchAnalysisRequest",
     "StructuredBatchAnalysisResponse",
+    "ShadowingAttemptRequest",
+    "ShadowingAttemptResponse",
+    "ShadowingEvaluationData",
+    "ShadowingHistoryItem",
+    "ShadowingHistoryResponse",
+    "ShadowingStatsResponse",
     "SpeechEvaluationData",
     "SpeechEvaluationResponse",
     "SpeechHistoryItem",
@@ -75,6 +90,7 @@ __all__ = [
     "StrengthItem",
     "SwitchProfileRequest",
     "UserResponse",
+    "WordDifference",
     "YoutubeAnalysisHistoryResponse",
     "YoutubeAnalysisRequest",
     "YoutubeAnalysisResponse",
