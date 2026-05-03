@@ -48,6 +48,7 @@ from schemas.shadowing import (
     WordDifference,
 )
 from schemas.youtube import (
+    TranscriptSegmentItem,
     YoutubeAnalysisHistoryResponse,
     YoutubeAnalysisRequest,
     YoutubeAnalysisResponse,
@@ -75,6 +76,7 @@ __all__ = [
     "StructuredBatchAnalysisListResponse",
     "StructuredBatchAnalysisRequest",
     "StructuredBatchAnalysisResponse",
+    "TranscriptSegmentItem",
     "ShadowingAttemptRequest",
     "ShadowingAttemptResponse",
     "ShadowingEvaluationData",

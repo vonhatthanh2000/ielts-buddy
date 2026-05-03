@@ -2,7 +2,7 @@ import json
 import os
 import re
 import tempfile
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
 from supabase.client import Client
@@ -24,7 +24,9 @@ def analyze_youtube_video(
         raise ValueError("Invalid YouTube URL. Could not extract video ID.")
 
     # Download audio and transcribe with MLX Whisper
-    transcript, video_title, used_mlx = _transcribe_with_mlx(video_id, url)
+    transcript, video_title, used_mlx, transcript_segments = _transcribe_with_mlx(
+        video_id, url
+    )
     if not transcript:
         raise ValueError(
             "Could not transcribe video. MLX transcription failed or is unavailable "
@@ -37,7 +39,9 @@ def analyze_youtube_video(
 
     # Run agent analysis
     raw = _run_agent(transcript)
-    parsed = _parse_output(url, video_title, transcript, raw)
+    parsed = _parse_output(
+        url, video_title, transcript, raw, transcript_segments=transcript_segments
+    )
 
     _save(parsed, supabase, profile_id)
 
@@ -68,11 +72,140 @@ def _extract_video_id(url: str) -> Optional[str]:
     return None
 
 
-def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Optional[str], bool]:
+def _split_transcript_into_sentences(text: str) -> list[str]:
+    """Split transcript on sentence-ending punctuation followed by whitespace."""
+    text = text.strip()
+    if not text:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    return [p.strip() for p in parts if p.strip()]
+
+
+def _concat_ranges_from_whisper_segments(
+    segments: list[dict[str, Any]],
+) -> tuple[str, list[tuple[int, int, float, float]]]:
+    """
+    Concatenate Whisper segment texts in order and record char ranges with wall times.
+
+    Returns (timeline_text, [(char_start, char_end, t_start, t_end), ...]).
+    """
+    offset = 0
+    ranges: list[tuple[int, int, float, float]] = []
+    parts: list[str] = []
+    for seg in segments:
+        txt = seg.get("text") or ""
+        if not txt:
+            continue
+        t0 = float(seg.get("start", 0.0))
+        t1 = float(seg.get("end", t0))
+        g0, g1 = offset, offset + len(txt)
+        ranges.append((g0, g1, t0, t1))
+        parts.append(txt)
+        offset = g1
+    return "".join(parts), ranges
+
+
+def _time_for_char_index(
+    char_index: float,
+    ranges: list[tuple[int, int, float, float]],
+) -> float:
+    """Piecewise-linear time for a character index into timeline_text."""
+    if not ranges:
+        return 0.0
+    total = ranges[-1][1]
+    ci = max(0.0, min(float(char_index), total - 1e-9))
+    for g0, g1, t0, t1 in ranges:
+        if g0 <= ci < g1 or (g1 >= total and g0 <= ci <= g1):
+            span = max(g1 - g0, 1e-6)
+            frac = (ci - g0) / span
+            return t0 + frac * (t1 - t0)
+    return ranges[-1][3]
+
+
+def _transcript_segments_from_whisper(
+    transcript: str, whisper_segments: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """
+    Build [{text, start_time, end_time}, ...] from MLX Whisper segments + full transcript text.
+
+    Maps each sentence's character span in the transcript onto the concatenated segment
+    string (same order as Whisper) to recover piecewise-linear timestamps.
+    """
+    transcript = transcript.strip()
+    if not transcript:
+        return []
+
+    clean_whisper = [s for s in whisper_segments if (s.get("text") or "").strip()]
+    if not clean_whisper:
+        return [
+            {
+                "text": transcript,
+                "start_time": 0.0,
+                "end_time": 0.0,
+            }
+        ]
+
+    timeline, ranges = _concat_ranges_from_whisper_segments(clean_whisper)
+    t_wall0 = float(clean_whisper[0].get("start", 0.0))
+    t_wall1 = float(clean_whisper[-1].get("end", t_wall0))
+    duration = max(t_wall1 - t_wall0, 1e-3)
+
+    sentences = _split_transcript_into_sentences(transcript)
+    if not sentences:
+        return [
+            {
+                "text": transcript,
+                "start_time": t_wall0,
+                "end_time": t_wall1,
+            }
+        ]
+
+    n_tr = max(len(transcript), 1)
+    tln = max(len(timeline), 1)
+
+    def times_for_span(cs: int, ce: int) -> tuple[float, float]:
+        if timeline:
+            m_start = int(cs * tln / n_tr)
+            m_end_excl = int(ce * tln / n_tr)
+            m_end_excl = max(m_end_excl, m_start + 1)
+            m_end_excl = min(m_end_excl, len(timeline))
+            end_idx = max(m_start, m_end_excl - 1)
+            m_start = min(max(0, m_start), len(timeline) - 1)
+            end_idx = min(max(m_start, end_idx), len(timeline) - 1)
+            st = _time_for_char_index(m_start, ranges)
+            en = _time_for_char_index(end_idx, ranges)
+            return st, max(en, st + 0.05)
+        st = t_wall0 + (cs / n_tr) * duration
+        en = t_wall0 + (ce / n_tr) * duration
+        return st, max(en, st + 0.05)
+
+    out: list[dict[str, Any]] = []
+    search_from = 0
+    for sent in sentences:
+        idx = transcript.find(sent, search_from)
+        if idx < 0:
+            idx = transcript.find(sent)
+        if idx < 0:
+            idx = search_from
+        cs, ce = idx, idx + len(sent)
+        search_from = ce
+        st, en = times_for_span(cs, ce)
+        if out and st < out[-1]["end_time"]:
+            st = out[-1]["end_time"]
+        if en <= st:
+            en = st + 0.05
+        out.append({"text": sent, "start_time": round(st, 3), "end_time": round(en, 3)})
+
+    return out
+
+
+def _transcribe_with_mlx(
+    video_id: str, url: str
+) -> tuple[Optional[str], Optional[str], bool, list[dict[str, Any]]]:
     """
     Download YouTube audio and transcribe using MLX Whisper.
 
-    Returns: (transcript, video_title, used_mlx=True)
+    Returns: (transcript, video_title, used_mlx, transcript_segments)
     """
     import logging
     import subprocess
@@ -85,7 +218,7 @@ def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Option
         logger.info("mlx_whisper imported successfully")
     except ImportError as e:
         logger.error(f"mlx_whisper not available: {e}")
-        return None, None, False
+        return None, None, False, []
 
     # Create temp directory for audio download
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -130,19 +263,19 @@ def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Option
             )
             if result.returncode != 0:
                 logger.error(f"yt-dlp failed: {result.stderr}")
-                return None, None, False
+                return None, None, False, []
             logger.info("yt-dlp download successful")
         except subprocess.TimeoutExpired:
             logger.error("yt-dlp timed out after 120 seconds")
-            return None, None, False
+            return None, None, False, []
         except FileNotFoundError:
             logger.error("yt-dlp not found. Install with: pip install yt-dlp")
-            return None, None, False
+            return None, None, False, []
 
         # Check if file was downloaded
         if not os.path.exists(audio_path):
             logger.error(f"Audio file not found at {audio_path}")
-            return None, None, False
+            return None, None, False, []
         logger.info(f"Audio file exists, size: {os.path.getsize(audio_path)} bytes")
 
         # Transcribe with MLX Whisper
@@ -154,11 +287,18 @@ def _transcribe_with_mlx(video_id: str, url: str) -> tuple[Optional[str], Option
                 verbose=False,
             )
             transcript = result.get("text", "").strip()
-            logger.info(f"MLX transcription successful, got {len(transcript)} characters")
-            return transcript, video_title, True
+            whisper_segments = result.get("segments") or []
+            transcript_segments = _transcript_segments_from_whisper(
+                transcript, whisper_segments
+            )
+            logger.info(
+                f"MLX transcription successful, got {len(transcript)} characters, "
+                f"{len(transcript_segments)} timed segments"
+            )
+            return transcript, video_title, True, transcript_segments
         except Exception as e:
             logger.error(f"MLX transcription failed: {type(e).__name__}: {e}")
-            return None, None, False
+            return None, None, False, []
 
 
 def _extract_title_from_transcript(transcript: str) -> Optional[str]:
@@ -185,8 +325,16 @@ def _run_agent(transcript: str) -> str:
     return response.content if hasattr(response, "content") else str(response)
 
 
-def _parse_output(url: str, video_title: str, transcript: str, raw: str) -> dict:
+def _parse_output(
+    url: str,
+    video_title: str,
+    transcript: str,
+    raw: str,
+    *,
+    transcript_segments: Optional[list[dict[str, Any]]] = None,
+) -> dict:
     """Parse agent output into structured data."""
+    segments = transcript_segments if transcript_segments is not None else []
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
@@ -194,6 +342,7 @@ def _parse_output(url: str, video_title: str, transcript: str, raw: str) -> dict
             "video_title": video_title,
             "video_url": url,
             "transcript": transcript,
+            "transcript_segments": segments,
             "useful_sentences": [],
             "grammar_patterns": [],
             "everyday_phrases": [],
@@ -211,6 +360,7 @@ def _parse_output(url: str, video_title: str, transcript: str, raw: str) -> dict
         "video_title": final_title,
         "video_url": url,
         "transcript": transcript,
+        "transcript_segments": segments,
         "useful_sentences": data.get("useful_sentences", []),
         "grammar_patterns": data.get("grammar_patterns", []),
         "everyday_phrases": data.get("everyday_phrases", []),
@@ -227,6 +377,7 @@ def _save(data: dict, supabase: Client, profile_id: str) -> None:
         "video_title": data.get("video_title", ""),
         "video_url": data.get("video_url", ""),
         "transcript": data.get("transcript", ""),
+        "transcript_segments": data.get("transcript_segments", []),
         "useful_sentences": data.get("useful_sentences", []),
         "grammar_patterns": data.get("grammar_patterns", []),
         "everyday_phrases": data.get("everyday_phrases", []),
@@ -296,7 +447,10 @@ def get_youtube_analysis_detail(
     """Load one YouTube analysis with full data."""
     res = (
         supabase.table("youtube_gem")
-        .select("id, video_title, video_url, transcript, useful_sentences, grammar_patterns, everyday_phrases, learning_tip, created_at")
+        .select(
+            "id, video_title, video_url, transcript, transcript_segments, "
+            "useful_sentences, grammar_patterns, everyday_phrases, learning_tip, created_at"
+        )
         .eq("id", analysis_id)
         .eq("profile_id", profile_id)
         .limit(1)
@@ -312,6 +466,7 @@ def get_youtube_analysis_detail(
         "video_title": row.get("video_title", ""),
         "video_url": row.get("video_url", ""),
         "transcript": row.get("transcript", ""),
+        "transcript_segments": row.get("transcript_segments") or [],
         "useful_sentences": row.get("useful_sentences", []),
         "grammar_patterns": row.get("grammar_patterns", []),
         "everyday_phrases": row.get("everyday_phrases", []),

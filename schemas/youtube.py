@@ -47,6 +47,16 @@ class EverydayPhraseItem(BaseModel):
     usage_context: str = Field(..., description="Sample situation for using this phrase.")
 
 
+class TranscriptSegmentItem(BaseModel):
+    """One timed sentence (or clause) for shadowing playback."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    text: str = Field(..., description="Transcript text for this span.")
+    start_time: float = Field(..., description="Start offset in seconds from the start of the video.")
+    end_time: float = Field(..., description="End offset in seconds from the start of the video.")
+
+
 class YoutubeAnalysisResponse(BaseModel):
     """Response containing YouTube transcript analysis."""
 
@@ -55,6 +65,10 @@ class YoutubeAnalysisResponse(BaseModel):
     video_title: str = Field(..., description="Title of the video (if available).")
     video_url: str = Field(..., description="The YouTube URL that was analyzed.")
     transcript: str = Field(..., description="The full transcript text extracted from the video.")
+    transcript_segments: List[TranscriptSegmentItem] = Field(
+        default_factory=list,
+        description="Transcript split into timed sentences for shadowing.",
+    )
     useful_sentences: List[UsefulSentenceItem] = Field(
         default_factory=list,
         description="Useful sentences demonstrating natural spoken English.",
