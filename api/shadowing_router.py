@@ -1,3 +1,7 @@
+# -----------------------------------------------------------------------------
+# SHADOWING — disabled. Not registered in main.py (unused; needs transcription).
+# -----------------------------------------------------------------------------
+
 import os
 import tempfile
 from typing import Optional

@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from supabase.client import Client
 
 from agents.youtube_analysis_agent import youtube_analysis_agent
+from services.transcription import transcribe_audio_file
 
 
 def analyze_youtube_video(
@@ -29,8 +30,8 @@ def analyze_youtube_video(
     )
     if not transcript:
         raise ValueError(
-            "Could not transcribe video. MLX transcription failed or is unavailable "
-            "(requires Apple Silicon Mac with mlx-whisper installed)."
+            "Could not transcribe video. Transcription failed "
+            "(requires mlx-whisper on Apple Silicon or faster-whisper in Docker/Linux)."
         )
 
     # Use extracted title or placeholder
@@ -212,14 +213,6 @@ def _transcribe_with_mlx(
 
     logger = logging.getLogger(__name__)
 
-    # Check if mlx_whisper is available
-    try:
-        import mlx_whisper
-        logger.info("mlx_whisper imported successfully")
-    except ImportError as e:
-        logger.error(f"mlx_whisper not available: {e}")
-        return None, None, False, []
-
     # Create temp directory for audio download
     with tempfile.TemporaryDirectory() as tmpdir:
         audio_path = os.path.join(tmpdir, f"{video_id}.m4a")
@@ -278,26 +271,23 @@ def _transcribe_with_mlx(
             return None, None, False, []
         logger.info(f"Audio file exists, size: {os.path.getsize(audio_path)} bytes")
 
-        # Transcribe with MLX Whisper
         try:
-            logger.info(f"Starting MLX transcription for {video_id}")
-            result = mlx_whisper.transcribe(
-                audio_path,
-                path_or_hf_repo="mlx-community/whisper-large-v3-turbo",
-                verbose=False,
-            )
-            transcript = result.get("text", "").strip()
-            whisper_segments = result.get("segments") or []
+            logger.info("Starting transcription for %s", video_id)
+            tr = transcribe_audio_file(audio_path)
+            if not tr or not tr.text:
+                return None, None, False, []
             transcript_segments = _transcript_segments_from_whisper(
-                transcript, whisper_segments
+                tr.text, tr.segments
             )
             logger.info(
-                f"MLX transcription successful, got {len(transcript)} characters, "
-                f"{len(transcript_segments)} timed segments"
+                "Transcription successful (%s), %d characters, %d timed segments",
+                tr.backend,
+                len(tr.text),
+                len(transcript_segments),
             )
-            return transcript, video_title, True, transcript_segments
+            return tr.text, video_title, tr.backend == "mlx", transcript_segments
         except Exception as e:
-            logger.error(f"MLX transcription failed: {type(e).__name__}: {e}")
+            logger.error(f"Transcription failed: {type(e).__name__}: {e}")
             return None, None, False, []
 
 

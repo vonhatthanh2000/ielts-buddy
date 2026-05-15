@@ -1,3 +1,7 @@
+# -----------------------------------------------------------------------------
+# SHADOWING — disabled. Not registered in main.py (unused; needs transcription).
+# -----------------------------------------------------------------------------
+
 import json
 import logging
 import os
@@ -7,6 +11,7 @@ from uuid import uuid4
 from supabase.client import Client
 
 from agents.shadowing_evaluation_agent import shadowing_evaluation_agent
+from services.transcription import transcribe_audio_file
 
 logger = logging.getLogger(__name__)
 
@@ -67,34 +72,16 @@ def process_shadowing_attempt(
 
 
 def _transcribe_audio(audio_path: str) -> Optional[str]:
-    """
-    Transcribe audio file using MLX Whisper.
-
-    Returns the transcribed text or None if transcription fails.
-    """
-    try:
-        import mlx_whisper
-    except ImportError as e:
-        logger.error(f"mlx_whisper not available: {e}")
+    """Transcribe audio (MLX on Apple Silicon, faster-whisper in Docker/Linux)."""
+    result = transcribe_audio_file(audio_path)
+    if not result:
         return None
-
-    if not os.path.exists(audio_path):
-        logger.error(f"Audio file not found: {audio_path}")
-        return None
-
-    try:
-        logger.info(f"Starting MLX transcription for shadowing: {audio_path}")
-        result = mlx_whisper.transcribe(
-            audio_path,
-            path_or_hf_repo="mlx-community/whisper-large-v3-turbo",
-            verbose=False,
-        )
-        transcript = result.get("text", "").strip()
-        logger.info(f"Transcription successful, got {len(transcript)} characters")
-        return transcript
-    except Exception as e:
-        logger.error(f"MLX transcription failed: {type(e).__name__}: {e}")
-        return None
+    logger.info(
+        "Shadowing transcription successful (%s), %d characters",
+        result.backend,
+        len(result.text),
+    )
+    return result.text
 
 
 def _upload_audio_to_storage(

@@ -1,3 +1,5 @@
+# SHADOWING — disabled. Only used when shadowing routes are enabled in main.py.
+
 from phi.agent import Agent
 from phi.model.openai import OpenAIChat
 

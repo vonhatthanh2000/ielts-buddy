@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.auth_router import router as auth_router
 from api.profile_router import router as profile_router
 from api.sentence_router import router as sentence_router
-from api.shadowing_router import router as shadowing_router
 from api.speech_router import router as speech_router
 from api.user_router import router as user_router
 from api.youtube_router import router as youtube_router
@@ -36,7 +35,10 @@ app.include_router(profile_router)
 app.include_router(user_router)
 app.include_router(youtube_router)
 app.include_router(speech_router)
-app.include_router(shadowing_router)
+
+# Shadowing disabled — feature unused (audio upload + Whisper; not suitable for Vercel).
+# from api.shadowing_router import router as shadowing_router
+# app.include_router(shadowing_router)
 
 
 @app.get("/health", tags=["health"])
