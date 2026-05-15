@@ -9,7 +9,7 @@ from schemas import (
     ProfileResponse,
     ProfileUpdate,
 )
-from supabase.client import Client, get_supabase
+from supabase_client import Client, get_supabase
 from services import profile_service
 
 router = APIRouter(prefix="/v1/profiles", tags=["profiles"])

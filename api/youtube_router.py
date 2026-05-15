@@ -8,7 +8,7 @@ from schemas import (
     YoutubeAnalysisRequest,
     YoutubeAnalysisResponse,
 )
-from supabase.client import Client, get_supabase
+from supabase_client import Client, get_supabase
 from services.youtube_service import (
     analyze_youtube_video,
     get_youtube_analysis_detail,

@@ -29,7 +29,7 @@ from services.shadowing_service import (
     list_shadowing_attempts,
     process_shadowing_attempt,
 )
-from supabase.client import Client, get_supabase
+from supabase_client import Client, get_supabase
 
 router = APIRouter(prefix="/v1/shadowing", tags=["shadowing"])
 

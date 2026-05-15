@@ -1,6 +1,6 @@
 from typing import Optional
 
-from supabase.client import Client
+from supabase_client import Client
 
 
 def get_user_by_id(supabase: Client, user_id: str) -> Optional[dict]:

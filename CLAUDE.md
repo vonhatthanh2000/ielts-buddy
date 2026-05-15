@@ -12,7 +12,8 @@ Prefer practical consistency with existing modules over abstract patterns.
 - `schemas/`: Pydantic request/response models shared across routers.
 - `services/`: business logic (`auth_service`, `user_service`, `sentence_service`).
 - `agents/`: Phidata/OpenAI prompt definitions and agent wiring.
-- `supabase/`: Supabase client singleton and DB access setup.
+- `supabase_client/`: Supabase Python client singleton (do not name this folder `supabase` — clashes with the PyPI package on Vercel).
+- `supabase/migrations/`: SQL migrations only (Supabase CLI).
 
 ---
 
@@ -63,7 +64,7 @@ Do not:
 - Raise HTTP-specific errors.
 - Implement persistence/orchestration logic.
 
-### 4) `supabase/` (infrastructure layer)
+### 4) `supabase_client/` (infrastructure layer)
 
 Do:
 - Expose a singleton `get_supabase()` client for dependency injection.
@@ -71,6 +72,7 @@ Do:
 
 Do not:
 - Mix feature logic into client initialization.
+- Put Python modules under a top-level `supabase/` package (shadows the installed SDK).
 
 ---
 

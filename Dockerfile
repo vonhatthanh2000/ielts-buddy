@@ -22,7 +22,7 @@ COPY requirements-docker.txt ./
 RUN pip install --upgrade pip \
     && pip install -r requirements-docker.txt
 
-COPY api/ agents/ main.py schemas/ services/ supabase/ ./
+COPY api/ agents/ main.py schemas/ services/ supabase_client/ supabase/ ./
 
 EXPOSE 8000
 

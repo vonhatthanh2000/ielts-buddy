@@ -53,6 +53,12 @@ In the Vercel project → **Settings** → **Environment Variables**:
 - `pyproject.toml` → `[tool.vercel] entrypoint = "main:app"` (do not put `main.py` under `functions` in `vercel.json`; that pattern only applies to files in the `api/` folder)
 - `vercel.json` — optional; leave empty or schema-only (no `functions.main.py`)
 
+## Supabase import fix
+
+The app uses **`supabase_client/`** for `get_supabase()`. Do not add `supabase/client.py` again — a local folder named `supabase` shadows the PyPI `supabase` package and breaks Vercel with `No module named 'supabase._sync'`.
+
+SQL migrations stay in **`supabase/migrations/`** (not a Python package).
+
 ## Shadowing
 
 Commented out in `main.py`. Hide shadowing UI in the frontend.

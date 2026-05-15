@@ -1,6 +1,6 @@
 from typing import Any, Optional
 
-from supabase.client import Client
+from supabase_client import Client
 
 MAX_PROFILES_PER_USER = 10
 

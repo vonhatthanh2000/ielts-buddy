@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from services import profile_service
 from services.auth_service import decode_session_token
-from supabase.client import Client, get_supabase
+from supabase_client import Client, get_supabase
 
 _bearer = HTTPBearer(auto_error=False)
 

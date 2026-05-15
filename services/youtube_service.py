@@ -5,7 +5,7 @@ import tempfile
 from typing import Any, Optional
 from urllib.parse import parse_qs, urlparse
 
-from supabase.client import Client
+from supabase_client import Client
 
 from agents.youtube_analysis_agent import youtube_analysis_agent
 from services.transcription import transcribe_audio_file

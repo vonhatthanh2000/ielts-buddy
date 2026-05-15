@@ -1,7 +1,7 @@
 import json
 from typing import Optional
 
-from supabase.client import Client
+from supabase_client import Client
 
 from agents.sentence_correct_agent import sentence_correct_agent
 from agents.batch_analysis_agent import batch_analysis_agent

@@ -4,7 +4,7 @@ import os
 from typing import Optional
 from uuid import uuid4
 
-from supabase.client import Client
+from supabase_client import Client
 
 from agents.speech_evaluation_agent import speech_evaluation_agent
 from services.transcription import transcribe_audio_file

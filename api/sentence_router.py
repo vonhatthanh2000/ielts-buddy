@@ -11,7 +11,7 @@ from schemas import (
     StructuredBatchAnalysisRequest,
     StructuredBatchAnalysisResponse,
 )
-from supabase.client import Client, get_supabase
+from supabase_client import Client, get_supabase
 from services.sentence_service import (
     correct_sentence,
     generate_batch_analysis,

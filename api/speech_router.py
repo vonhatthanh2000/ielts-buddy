@@ -24,7 +24,7 @@ from services.speech_service import (
     list_speech_recordings,
     process_speech_recording,
 )
-from supabase.client import Client, get_supabase
+from supabase_client import Client, get_supabase
 
 router = APIRouter(prefix="/v1/speech", tags=["speech"])
 
