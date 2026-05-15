@@ -50,7 +50,8 @@ In the Vercel project → **Settings** → **Environment Variables**:
 - `requirements.txt` — mirror for local `pip install -r` (keep in sync)
 - `requirements-docker.txt` — Docker image (includes transcription)
 - `requirements-local.txt` — optional local transcription on Mac
-- `vercel.json` — function settings (entrypoint is `main:app` via `tool.vercel`)
+- `pyproject.toml` → `[tool.vercel] entrypoint = "main:app"` (do not put `main.py` under `functions` in `vercel.json`; that pattern only applies to files in the `api/` folder)
+- `vercel.json` — optional; leave empty or schema-only (no `functions.main.py`)
 
 ## Shadowing
 
